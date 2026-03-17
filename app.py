@@ -45,6 +45,7 @@ def init_state():
         "target_lang": "uz",
         "theme": "dark",
         "tts_engine": "Muxlisa",
+        "autoplay": False,
     }
     for k, v in defaults.items():
         if k not in st.session_state:
@@ -616,6 +617,13 @@ if st.session_state.processing and st.session_state.video_path:
         segments = stt.transcribe(audio_path)
         st.session_state.segments = segments
 
+        # Whisper modelini xotiradan tozalash (RAM tejash)
+        stt.cleanup()
+        st.session_state.stt_engine = None
+        import gc
+        gc.collect()
+        print("[App] Whisper modeli xotiradan tozalandi. RAM bo'shatildi.")
+
         # Temp audio faylni o'chirish
         from utils import cleanup_file
         cleanup_file(audio_path)
@@ -781,6 +789,7 @@ else:
             # Agar kamida bitta natija bo'lsa, avtomatik birinchi natija vaqtiga o'tkazish
             if results and len(results) > 0:
                 st.session_state.play_timestamp = float(results[0]["start"])
+                st.session_state.autoplay = True
                 st.rerun()
 
         if st.session_state.last_results:
@@ -812,6 +821,7 @@ else:
 
                 if st.button(f"▶ {start_fmt} dan ijro etish", key=f"play_{i}_{start_fmt}"):
                     st.session_state.play_timestamp = float(res["start"])
+                    st.session_state.autoplay = True
                     st.rerun()
 
         elif st.session_state.last_results == [] and perform_search:
@@ -845,15 +855,19 @@ else:
                 if is_audio:
                     if st.session_state.segments:
                         from subtitle_engine import render_youtube_player
-                        render_youtube_player(st.session_state.video_path, st.session_state.segments, start_time=start_time)
+                        render_youtube_player(st.session_state.video_path, st.session_state.segments, start_time=start_time, autoplay=st.session_state.autoplay)
                     else:
-                        st.audio(st.session_state.video_path, start_time=start_time)
+                        st.audio(st.session_state.video_path, start_time=start_time, autoplay=st.session_state.autoplay)
                 else:
                     if st.session_state.segments:
                         from subtitle_engine import render_youtube_player
-                        render_youtube_player(st.session_state.video_path, st.session_state.segments, start_time=start_time)
+                        render_youtube_player(st.session_state.video_path, st.session_state.segments, start_time=start_time, autoplay=st.session_state.autoplay)
                     else:
-                        st.video(st.session_state.video_path, start_time=start_time)
+                        st.video(st.session_state.video_path, start_time=start_time, autoplay=st.session_state.autoplay)
+                
+                # Qayta o'chiramiz, tokik keyingi marta o'z-o'zidan play bo'lmasin
+                if st.session_state.autoplay:
+                    st.session_state.autoplay = False
             except Exception as e:
                 st.error(f"Media yuklashda xato: {e}")
 

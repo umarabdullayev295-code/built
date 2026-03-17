@@ -269,3 +269,13 @@ class SpeechToText:
 
     def get_full_text(self, segments: List[Dict]) -> str:
         return " ".join(s["text"] for s in segments if s.get("text"))
+
+    def cleanup(self):
+        """Whisper modelini va API clientni xotiradan tozalaydi (RAM bo'shatish)."""
+        if self._whisper_model is not None:
+            del self._whisper_model
+            self._whisper_model = None
+            print("[STT] Whisper modeli xotiradan o'chirildi.")
+        if self._api_client is not None:
+            del self._api_client
+            self._api_client = None
