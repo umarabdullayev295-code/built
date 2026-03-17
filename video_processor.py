@@ -17,7 +17,7 @@ def extract_audio(
     output_dir: Optional[str] = None,
     format: str = "wav",
     sample_rate: int = 16000,
-) -> Optional[str]:
+) -> Tuple[Optional[str], Optional[str]]:
     """
     Video fayldan audio ajratib oladi.
 
@@ -31,8 +31,7 @@ def extract_audio(
         Audio fayl yo'li yoki None (xato bo'lsa)
     """
     if not os.path.exists(video_path):
-        print(f"[VideoProcessor] Fayl topilmadi: {video_path}")
-        return None
+        return None, f"Fayl topilmadi: {video_path}"
 
     if output_dir is None:
         output_dir = tempfile.mkdtemp(prefix="video_ai_")
@@ -62,8 +61,7 @@ def extract_audio(
         else:
             with VideoFileClip(video_path) as clip:
                 if clip.audio is None:
-                    print("[VideoProcessor] ERROR: Videoda audio trek yo'q!")
-                    return None
+                    return None, "Videoda audio trek mavjud emas."
                     
                 clip.audio.write_audiofile(
                     audio_path,
@@ -74,15 +72,15 @@ def extract_audio(
                 )
 
         print(f"[VideoProcessor] Audio ajratildi (MoviePy): {audio_path}")
-        return audio_path
+        return audio_path, None
 
-    except ImportError:
-        print("[VideoProcessor] moviepy o'rnatilmagan. Quyidagi buyruqni bajaring:")
-        print("  pip install moviepy")
-        return None
+    except ImportError as e:
+        return None, f"Kutubxona xatosi: {e} (moviepy o'rnatilmagan bo'lishi mumkin)"
     except Exception as e:
-        print(f"[VideoProcessor] Audio ajratishda xato: {e}")
-        return None
+        import traceback
+        err_trace = traceback.format_exc()
+        print(f"[VideoProcessor] Audio ajratishda xato:\n{err_trace}")
+        return None, str(e)
 
 
 def get_video_duration(video_path: str) -> Optional[float]:

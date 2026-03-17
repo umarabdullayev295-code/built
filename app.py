@@ -602,10 +602,10 @@ if st.session_state.processing and st.session_state.video_path:
         status_text.markdown("**2/4** 🔊 Audio ajratilmoqda (Tezkor rejim)...")
         progress_bar.progress(25)
         from video_processor import extract_audio
-        audio_path = extract_audio(video_path, format="mp3", sample_rate=16000)
+        audio_path, err_msg = extract_audio(video_path, format="mp3", sample_rate=16000)
 
         if not audio_path:
-            st.error("❌ Audio ajratib bo'lmadi. Video fayldа audio trek mavjudligini tekshiring.")
+            st.error(f"❌ Audio ajratish xatosi:\n\n`{err_msg}`\n\nVideo faylda audio trek mavjudligini yoki format to'g'riligini tekshiring.")
             st.stop()
 
         progress_bar.progress(40)
