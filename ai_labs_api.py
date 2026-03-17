@@ -10,8 +10,12 @@ import tempfile
 import time
 import random
 from typing import List, Dict, Optional
-from elevenlabs.client import ElevenLabs
 import httpx
+
+try:
+    from elevenlabs.client import ElevenLabs
+except ImportError:
+    ElevenLabs = None
 
 # Local components
 try:
@@ -32,7 +36,7 @@ class ElevenLabsClient:
 
     def __init__(self, api_key: str = None):
         self.api_key = api_key or os.environ.get("ELEVENLABS_API_KEY")
-        self.available = bool(self.api_key)
+        self.available = bool(self.api_key) and (ElevenLabs is not None)
 
     def _simulate_human_usage(self):
         """Simulates human-like behavior with natural pauses between requests."""
