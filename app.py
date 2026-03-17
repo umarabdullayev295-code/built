@@ -40,7 +40,7 @@ def init_state():
         "last_results": [],
         "engine_name": "",
         "video_duration": 0,
-        "elevenlabs_key": os.environ.get("ELEVENLABS_API_KEY", ""),
+        "elevenlabs_key": os.environ.get("ELEVENLABS_API_KEY") or (st.secrets.get("ELEVENLABS_API_KEY", "") if hasattr(st, "secrets") else ""),
         "whisper_model": "medium",
         "target_lang": "uz",
         "theme": "dark",
@@ -459,13 +459,15 @@ with st.sidebar:
         
         engine_choice = st.selectbox(
             "Transkripsiya modeli:",
-            ["Muxlisa AI (Pro)", "Whisper (Asosiy)"],
+            ["Muxlisa AI (Pro)", "ElevenLabs (Premium)", "Whisper (Asosiy)"],
             index=0 if st.session_state.target_lang == "uz" else 1,
-            help="O'zbek tili uchun 'Muxlisa AI' tavsiya etiladi. Boshqa tillar uchun 'Asosiy' model ishonchliroq.",
+            help="O'zbek tili uchun 'Muxlisa AI' tavsiya etiladi. Boshqa tillar uchun 'ElevenLabs' yoki 'Whisper' tanlang.",
         )
 
         if engine_choice == "Muxlisa AI (Pro)":
             st.success("🛰️ Muxlisa AI (National) faol. O'zbek tili bo'yicha mutaxassis model.")
+        elif engine_choice == "ElevenLabs (Premium)":
+            st.success("🌍 ElevenLabs Scribe v2 faol. 100+ tilni qo'llab-quvvatlaydi.")
         else:
             st.session_state.whisper_model = st.selectbox(
                 "Whisper model hajmi:",
@@ -606,8 +608,8 @@ if st.session_state.processing and st.session_state.video_path:
         stt = SpeechToText(
             whisper_model_size=st.session_state.whisper_model,
             language=st.session_state.target_lang,
-            use_api=(engine_choice in ["Muxlisa AI (Pro)"]),
-            elevenlabs_api_key=None,
+            use_api=(engine_choice in ["Muxlisa AI (Pro)", "ElevenLabs (Premium)"]),
+            elevenlabs_api_key=st.session_state.elevenlabs_key or None,
             engine_name=engine_choice
         )
         st.session_state.stt_engine = stt

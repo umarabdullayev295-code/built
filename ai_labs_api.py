@@ -226,7 +226,7 @@ class MuxlisaClient:
         return bool(self.api_key)
 
 
-def get_best_api_client(engine_name: str = "ElevenLabs"):
+def get_best_api_client(engine_name: str = "ElevenLabs", api_key: str = None):
     """
     Mavjud eng yaxshi API mijozini qaytaradi.
     """
@@ -235,15 +235,16 @@ def get_best_api_client(engine_name: str = "ElevenLabs"):
         if muxlisa.is_available():
             return muxlisa, "Muxlisa AI (Pro)"
             
-    if "Noiz AI" in engine_name:
-        # Noiz AI STT hozircha ElevenLabs fallback sifatida
-        elevenlabs = ElevenLabsClient()
+    if "ElevenLabs" in engine_name or "Noiz" in engine_name:
+        elevenlabs = ElevenLabsClient(api_key=api_key)
         if elevenlabs.is_available():
-            return elevenlabs, "Noiz AI (Professional)"
+            name = "ElevenLabs (Premium)" if "ElevenLabs" in engine_name else "Noiz AI (Professional)"
+            return elevenlabs, name
 
-    elevenlabs = ElevenLabsClient()
+    # Fallback to general checking
+    elevenlabs = ElevenLabsClient(api_key=api_key)
     if elevenlabs.is_available():
-        name = "My AI (Premium)" if "My AI" in engine_name else "O'zbek AI Model (Pro)"
-        return elevenlabs, name
+        return elevenlabs, "ElevenLabs (Premium)"
 
     return None, None
+
