@@ -29,8 +29,16 @@ def eleven_tts(text: str) -> Optional[bytes]:
     ElevenLabs API ni chaqiradi va audio bytes qaytaradi.
     Text juda uzun bo'lsa, uni bo'laklarga bo'lib, birlashtirib bitta request yuboradi.
     """
-    if not API_KEY:
-        logger.error("❌ XATO: ELEVEN_API_KEY topilmadi.")
+    api_key = API_KEY
+    if not api_key:
+        try:
+            import streamlit as st
+            api_key = st.secrets.get("ELEVENLABS_API_KEY", "")
+        except:
+            pass
+            
+    if not api_key:
+        logger.error("❌ XATO: ELEVENLABS_API_KEY topilmadi.")
         return None
 
     try:
@@ -43,7 +51,7 @@ def eleven_tts(text: str) -> Optional[bytes]:
             text = " ".join(chunks) # Bitta request uchun birlashtirildi
             logger.info(f"Birlashtirilgan text uzunligi: {len(text)}")
 
-        client = ElevenLabs(api_key=API_KEY)
+        client = ElevenLabs(api_key=api_key)
         
         logger.info("🚀 ElevenLabs chaqirildi...")
         audio_generator = client.text_to_speech.convert(
@@ -157,15 +165,20 @@ def safe_tts(text: str, engine: str = "Whisper") -> tuple[Optional[bytes], List[
     engine: 'Whisper'
     """
     # Hozircha faqat Whisper (lokal) yoki kelajakda Muxlisa TTS qo'shilishi mumkin
-    # Bir vaqtning o'zida faqat 1 ta generate ishlasin
     with _tts_lock:
         logger.info(f"🎯 TTS jarayoni boshlandi ({engine})...")
         
-        # Muxlisa TTS hozircha mavjud emas, shuning uchun Whisper fallback
-        # Eslatma: Haqiqiy TTS motori kerak bo'ladi.
-        # Agar ElevenLabs va Noiz o'chirilsa, lokal motor (masalan gTTS yoki pyttsx3) kerak.
-        # Hozircha bo'sh qaytaramiz yoki ogohlantiramiz.
-        
+        audio_bytes = None
+        if "ElevenLabs" in engine:
+            audio_bytes = eleven_tts(text)
+        elif "Noiz" in engine:
+            audio_bytes = noiz_tts(text)
+            
+        if audio_bytes:
+            # Vaqtlarni aniqlash uchun Whisper
+            segments = align_tts_with_whisper(audio_bytes, text)
+            return audio_bytes, segments
+            
         return None, []
 
 def save_audio_to_file(audio_bytes: bytes, filename: str = "output.mp3"):

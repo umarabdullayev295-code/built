@@ -915,10 +915,17 @@ else:
             st.session_state.tts_engine = "ElevenLabs" # Default value
 
         st.markdown("### 🗣️ Matnni nutqqa aylantirish (TTS)")
-        st.session_state.tts_engine = st.radio(
-            "TTS Engine:",
-            ["Muxlisa", "Whisper"],
-            index=0 if st.session_state.tts_engine == "Muxlisa" else 1,
+        tts_options = ["Muxlisa AI", "ElevenLabs (Premium)", "Whisper (Asosiy)"]
+        default_idx = 0
+        if "ElevenLabs" in getattr(st.session_state, "tts_engine", ""):
+            default_idx = 1
+        elif "Whisper" in getattr(st.session_state, "tts_engine", ""):
+            default_idx = 2
+            
+        st.session_state.tts_engine = st.selectbox(
+            "TTS Motorini tanlang:",
+            tts_options,
+            index=default_idx,
             help="Nutq generatsiya qilish uchun modelni tanlang."
         )
 
