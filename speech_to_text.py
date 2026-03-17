@@ -11,7 +11,15 @@ O'zbek tili uchun optimallashtirilgan.
 """
 
 import os
+import gc
+import streamlit as st
 from typing import List, Dict, Optional
+
+@st.cache_resource
+def load_whisper_model(model_size: str, device: str, compute_type: str):
+    from faster_whisper import WhisperModel
+    print(f"[STT] Whisper yuklanmoqda: {model_size} ({device})...")
+    return WhisperModel(model_size, device=device, compute_type=compute_type)
 
 
 class SpeechToText:
@@ -200,9 +208,8 @@ class SpeechToText:
 
     # ------------------------------------------------------------------ #
     def _load_whisper(self):
-        """Whisper modelini lazy loading bilan yuklaydi."""
+        """Whisper modelini lazy loading va st.cache_resource bilan yuklaydi."""
         if self._whisper_model is None:
-            from faster_whisper import WhisperModel
             device = "cpu"
             compute_type = "int8"
             try:
@@ -212,8 +219,8 @@ class SpeechToText:
                     compute_type = "float16"
             except ImportError:
                 pass
-            print(f"[STT] Whisper yuklanmoqda: {self.whisper_model_size} ({device})...")
-            self._whisper_model = WhisperModel(
+            
+            self._whisper_model = load_whisper_model(
                 self.whisper_model_size, device=device, compute_type=compute_type
             )
         return self._whisper_model

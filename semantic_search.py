@@ -10,7 +10,15 @@ Bu model 50+ tilni, jumladan o'zbek tilini ham qo'llab-quvvatlaydi.
 """
 
 import numpy as np
+import gc
+import streamlit as st
 from typing import List, Dict, Optional, Tuple
+
+@st.cache_resource
+def load_sentence_model(model_name: str):
+    from sentence_transformers import SentenceTransformer
+    print(f"[SemanticSearch] Model yuklanmoqda: {model_name}...")
+    return SentenceTransformer(model_name)
 
 
 # O'zbek tilini yaxshi qo'llab-quvvatlaydigan ko'p tilli modellar
@@ -42,12 +50,9 @@ class SemanticSearch:
         self.dimension: int = 0
 
     def _load_encoder(self):
-        """Encoder modelini lazy loading bilan yuklaydi."""
+        """Encoder modelini lazy loading va st.cache_resource bilan yuklaydi."""
         if self._encoder is None:
-            from sentence_transformers import SentenceTransformer
-            print(f"[SemanticSearch] Model yuklanmoqda: {self.model_name}...")
-            self._encoder = SentenceTransformer(self.model_name)
-            print(f"[SemanticSearch] Model yuklandi.")
+            self._encoder = load_sentence_model(self.model_name)
         return self._encoder
 
     def add_transcripts(self, segments: List[Dict]) -> int:

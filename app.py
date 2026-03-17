@@ -10,6 +10,7 @@ import os
 import json
 import tempfile
 import time
+import gc
 from pathlib import Path
 from dotenv import load_dotenv
 
@@ -41,7 +42,7 @@ def init_state():
         "engine_name": "",
         "video_duration": 0,
         "elevenlabs_key": os.environ.get("ELEVENLABS_API_KEY", ""),
-        "whisper_model": "medium",
+        "whisper_model": "base",
         "target_lang": "uz",
         "theme": "dark",
         "tts_engine": "Muxlisa",
@@ -485,17 +486,29 @@ with st.sidebar:
             or os.path.getsize(temp_video_path) == 0
         ):
             uploaded_video.seek(0)
+            # RAM tejash uchun faylni bo'laklab saqlash
             with open(temp_video_path, "wb") as f:
-                f.write(uploaded_video.read())
+                while True:
+                    chunk = uploaded_video.read(1024 * 1024) # 1MB chunks
+                    if not chunk:
+                        break
+                    f.write(chunk)
+            # Memory clearing
+            gc.collect()
 
         # Yangi video yoki o'zgartirish holatida tasdiqlash tugmasi
         if st.session_state.video_path != temp_video_path:
             if st.button("🚀 Qayta Ishlash", use_container_width=True):
+                # Aggressively clear memory before starting new processing
+                st.session_state.search_engine = None
+                st.session_state.stt_engine = None
+                st.session_state.segments = []
+                st.session_state.last_results = []
+                gc.collect()
+                
                 st.session_state.video_path = temp_video_path
                 st.session_state.video_name = file_name
-                st.session_state.segments = []
                 st.session_state.index_built = False
-                st.session_state.last_results = []
                 st.session_state.play_timestamp = 0
                 st.session_state.processing = True
                 st.rerun()
@@ -519,6 +532,15 @@ with st.sidebar:
         if st.button("🌙 Dark", use_container_width=True, key="dark_btn"):
             st.session_state.theme = "dark"
             st.rerun()
+
+    st.markdown("---")
+    if st.button("🗑️ Cache va RAMni tozalash", use_container_width=True, help="Barcha yuklangan modellar va vaqtinchalik xotirani tozalaydi"):
+        st.cache_resource.clear()
+        st.cache_data.clear()
+        gc.collect()
+        st.success("✅ Xotira tozalandi!")
+        time.sleep(1)
+        st.rerun()
 
     st.markdown("""
     <div style="text-align:center; padding-top: 0.5rem;">
@@ -604,6 +626,9 @@ if st.session_state.processing and st.session_state.video_path:
 
         progress_bar.progress(100)
         status_text.markdown(f"✅ **Tayyorlandi!** {count} segment indekslandi.")
+        
+        # Tugatgandan so'ng xotirani tozalash
+        gc.collect()
         time.sleep(1)
 
     st.rerun()

@@ -9,6 +9,7 @@ WAV formatida saqlash tavsiya etiladi (yuqori sifat).
 import os
 import uuid
 import tempfile
+import gc
 from typing import Optional, Tuple
 
 
@@ -83,6 +84,7 @@ def extract_audio(
                 return None
 
         print(f"[VideoProcessor] Audio ajratildi (Tezkor STT rejim): {audio_path}")
+        gc.collect()
         return audio_path
 
     except ImportError:
