@@ -442,10 +442,19 @@ with col_theme:
     st.write("") # Bo'sh joy qo'shish (hizslash uchun)
     st.write("")
     st.write("")
-    current_icon = "☀️ Light" if st.session_state.theme == "dark" else "🌙 Dark"
-    if st.button(current_icon, use_container_width=True, key="theme_btn_top"):
-        st.session_state.theme = "light" if st.session_state.theme == "dark" else "dark"
-        st.rerun()
+    
+    # 3 nuqta menyusi (popover)
+    with st.popover("⋮"):
+        st.markdown("**Mavzuni O'zgartirish**")
+        c1, c2 = st.columns(2)
+        with c1:
+            if st.button("☀️ Light", use_container_width=True, key="theme_l"):
+                st.session_state.theme = "light"
+                st.rerun()
+        with c2:
+            if st.button("🌙 Dark", use_container_width=True, key="theme_d"):
+                st.session_state.theme = "dark"
+                st.rerun()
 
 # ─────────────────────────────────────────────
 # SIDEBAR — Sozlamalar va Video yuklash
