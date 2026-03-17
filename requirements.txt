@@ -7,12 +7,17 @@ moviepy>=1.0.3
 # Speech-to-text (CPU mode for Streamlit Cloud)
 faster-whisper>=1.0.0
 
+# Semantic Search & Vectors
+faiss-cpu>=1.8.0
+sentence-transformers>=2.6.0
+
 # HTTP client for Muxlisa AI API
 httpx>=0.27.0
 
 # Environment variable management
 python-dotenv>=1.0.0
 
-# Audio processing
+# Subtitles and Audio processing
+python-srt>=0.2.3
 soundfile>=0.12.1
 numpy>=1.26.0
