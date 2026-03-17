@@ -10,7 +10,10 @@ import tempfile
 import time
 import random
 from typing import List, Dict, Optional
-from elevenlabs.client import ElevenLabs
+try:
+    from elevenlabs.client import ElevenLabs
+except ImportError:
+    ElevenLabs = None
 import httpx
 
 # Local components

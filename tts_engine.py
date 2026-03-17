@@ -6,7 +6,10 @@ import threading
 import logging
 import httpx
 from typing import Optional, List, Dict
-from elevenlabs.client import ElevenLabs
+try:
+    from elevenlabs.client import ElevenLabs
+except ImportError:
+    ElevenLabs = None
 
 # --- Konfiguratsiya ---
 # Environment variable'dan olinadi

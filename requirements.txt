@@ -3,4 +3,7 @@ moviepy
 faster-whisper
 httpx
 python-dotenv
-python-srt
+faiss-cpu
+sentence-transformers
+numpy
+soundfile
