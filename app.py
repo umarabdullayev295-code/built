@@ -387,6 +387,42 @@ div[data-testid="stRadio"] label {{
 .stat-value {{ font-size: 1.2rem; font-weight: 800; color: var(--primary-color); }}
 .stat-label {{ font-size: 0.7rem; color: var(--text-color); opacity: 0.6; text-transform: uppercase; margin-top: 0.2rem; }}
 
+/* ── Mobile Responsiveness ── */
+@media (max-width: 768px) {{
+    .main-header {{
+        padding: 2rem 0;
+    }}
+    .main-header h1 {{
+        font-size: 2.5rem !important;
+        letter-spacing: -1px;
+    }}
+    .main-header p {{
+        font-size: 1.1rem;
+    }}
+    .info-banner {{
+        padding: 1.5rem;
+    }}
+    .info-banner h3 {{
+        font-size: 1.4rem !important;
+    }}
+    .result-card {{
+        padding: 1rem;
+    }}
+    .score-badge {{
+        padding: 0.3rem 0.8rem;
+        font-size: 0.7rem;
+    }}
+    /* Make stat grid stack on very small screens */
+    .stat-grid {{
+        grid-template-columns: 1fr;
+    }}
+    /* Adjust Streamlit button padding */
+    .stButton > button {{
+        padding: 0.5rem 1rem !important;
+        font-size: 0.95rem !important;
+    }}
+}}
+
 </style>
 """, unsafe_allow_html=True)
 

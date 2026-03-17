@@ -117,6 +117,21 @@ def render_youtube_player(video_path: str, segments: List[Dict], start_time: flo
             font-weight: 700;
             /* text-decoration: underline; Optional YouTube auto-caption vibe */
         }}
+
+        /* ── Mobile Responsiveness ── */
+        @media (max-width: 768px) {{
+            .subtitle-overlay {{
+                bottom: 10%;
+            }}
+            .caption-box {{
+                max-width: 95%;
+                padding: 4px 10px;
+            }}
+            .word {{
+                font-size: 1.0rem; /* Smaller font on mobile */
+                margin: 0 2px;
+            }}
+        }}
     </style>
 
     <div class="player-container">
