@@ -69,6 +69,10 @@ class ElevenLabsClient:
         iso3_lang = lang_map.get(language, "uzb")
 
         try:
+            if ElevenLabs is None:
+                print("[AI Engine] ElevenLabs kutubxonasi o'rnatilmagan yoki yuklanmadi.")
+                return []
+                
             client = ElevenLabs(api_key=self.api_key)
             with open(audio_path, "rb") as audio_file:
                 response = client.speech_to_text.convert(
@@ -102,6 +106,10 @@ class ElevenLabsClient:
         self._simulate_human_usage()
 
         try:
+            if ElevenLabs is None:
+                print("[AI Engine] ElevenLabs kutubxonasi o'rnatilmagan.")
+                return None
+                
             client = ElevenLabs(api_key=self.api_key)
             audio_generator = client.generate(
                 text=text,
