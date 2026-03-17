@@ -152,7 +152,7 @@ class ElevenLabsClient:
                 "text": raw_text,
             }]
 
-        return [s for s in segments if s.get("text", "").strip()]
+        return [s for s in segments if str(s.get("text", "")).strip()]
 
     def _words_to_segments(self, words: list) -> List[Dict]:
         """
@@ -168,7 +168,7 @@ class ElevenLabsClient:
             if w.get("type", "word") != "word":
                 continue
             
-            word_text = w.get("text", w.get("word", "")).strip()
+            word_text = str(w.get("text", w.get("word", ""))).strip()
             if not word_text:
                 continue
 
