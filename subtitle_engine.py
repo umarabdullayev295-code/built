@@ -86,56 +86,60 @@ def render_youtube_player(video_path: str, segments: List[Dict], start_time: flo
         }}
 
         .caption-box {{
-            background: rgba(8, 8, 8, 0.85); /* Deep dark background */
-            padding: 6px 16px;
+            background: rgba(0, 0, 0, 0.7); /* YouTube-style semi-transparent black */
+            padding: 8px 20px;
             border-radius: 4px;
-            max-width: 80%;
+            max-width: 90%;
             display: flex;
             flex-wrap: wrap;
             justify-content: center;
             align-items: center;
+            min-height: 2em;
         }}
 
         .word {{
-            display: none; /* Hidden by default */
+            display: inline-block;
             font-family: 'Roboto', 'Inter', sans-serif;
-            font-size: 1.4rem;  /* Clearer size */
-            color: #aaaaaa;     /* Dim gray for inactive words */
-            margin: 0 4px;
-            transition: color 0.15s ease;
+            font-size: 1.6rem;
+            color: rgba(255, 255, 255, 0.4); /* Dim white for context */
+            margin: 0 5px;
+            transition: all 0.1s ease;
             font-weight: 500;
-            text-shadow: 1px 1px 2px rgba(0,0,0,0.8);
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.5);
+            opacity: 0; /* Initially hidden */
+            transform: translateY(5px);
         }}
 
         .word.visible {{
-            display: inline-block;
+            opacity: 1;
+            transform: translateY(0);
         }}
 
         .word.active {{
-            display: inline-block;
-            color: #ffffff;     /* Bright white for active word */
+            color: #ffffff;
             font-weight: 700;
-            /* text-decoration: underline; Optional YouTube auto-caption vibe */
+            transform: scale(1.1);
+            text-shadow: 0 0 10px rgba(255,255,255,0.5);
         }}
 
         /* ── Mobile Responsiveness ── */
         @media (max-width: 768px) {{
             .subtitle-overlay {{
-                bottom: 10%;
+                bottom: 12%;
             }}
             .caption-box {{
                 max-width: 95%;
-                padding: 4px 10px;
+                padding: 6px 12px;
             }}
             .word {{
-                font-size: 1.0rem; /* Smaller font on mobile */
-                margin: 0 2px;
+                font-size: 1.1rem;
+                margin: 0 3px;
             }}
         }}
     </style>
 
     <div class="player-container">
-        <{tag} id="mainMedia" controls crossorigin="anonymous">
+        <{tag} id="mainMedia" controls crossorigin="anonymous" style="width:100%; height:100%;">
             <source src="data:{mime_type};base64,{video_b64}" type="{mime_type}">
         </{tag}>
         
@@ -159,54 +163,42 @@ def render_youtube_player(video_path: str, segments: List[Dict], start_time: flo
             media.currentTime = {start_time};
         }}
 
-        let rafId = null;
         function updateSubtitles() {{
             const ct = media.currentTime;
-            let currentActiveIndex = -1;
-
-            // 1. Faol so'zni topish
+            
             words.forEach((w, index) => {{
                 const start = parseFloat(w.dataset.start);
                 const end = parseFloat(w.dataset.end);
 
+                // Word is ACTIVE if current time is within its bounds
                 if (ct >= start && ct <= end) {{
                     w.classList.add('active');
                     w.classList.add('visible');
-                    currentActiveIndex = index;
-                }} else {{
+                    w.style.display = 'inline-block';
+                }} else if (ct > end) {{
+                    // Word has passed - keep visible but not active
+                    w.classList.remove('active');
+                    w.classList.add('visible');
+                    // Hide words that are too old (e.g., more than 4 seconds ago)
+                    if (ct - end > 4.0) {{
+                        w.style.display = 'none';
+                    }} else {{
+                        w.style.display = 'inline-block';
+                    }}
+                }} else if (ct < start) {{
+                    // Word is in the future
                     w.classList.remove('active');
                     w.classList.remove('visible');
+                    w.style.display = 'none';
                 }}
             }});
 
-            // 2. "Dona-dona" effekt: Atrofdagi so'zlarni ham ko'rsatish (xuddi YouTube line kabi)
-            if (currentActiveIndex !== -1) {{
-                // Hozirgi so'zdan oldingi 2 ta va keyingi 2 ta so'zni ko'rsatamiz (Kichikroq footprint)
-                const startRange = Math.max(0, currentActiveIndex - 2);
-                const endRange = Math.min(words.length - 1, currentActiveIndex + 2);
-                
-                for (let i = startRange; i <= endRange; i++) {{
-                    words[i].classList.add('visible');
-                }}
-                captionBox.style.display = 'flex';
-            }} else {{
-                // Agar hech qanday so'z faol bo'lmasa va vaqt yaqin bo'lmasa, yashirish
-                let anyVisible = false;
-                words.forEach(w => {{
-                    if (w.classList.contains('visible')) anyVisible = true;
-                }});
-                if (!anyVisible) captionBox.style.display = 'none';
-            }}
-
-            rafId = requestAnimationFrame(updateSubtitles);
+            requestAnimationFrame(updateSubtitles);
         }}
 
-        media.addEventListener('play', () => {{
-            rafId = requestAnimationFrame(updateSubtitles);
-        }});
-        media.addEventListener('pause', () => {{
-            cancelAnimationFrame(rafId);
-        }});
+        // Start the loop
+        requestAnimationFrame(updateSubtitles);
+
         media.addEventListener('seeked', updateSubtitles);
 
         // Click to jump
