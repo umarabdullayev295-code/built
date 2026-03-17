@@ -63,12 +63,12 @@ class SpeechToText:
 
         # 1. Muxlisa AI
         if "Muxlisa" in engine_name:
-            client, name = get_best_api_client(engine_name="Muxlisa")
+            client, name = get_best_api_client(engine_name="Muxlisa", api_key=el_key)
             if client:
                 return client, name
 
         # 2. Fallback: Avtomatik tanlash (Muxlisa yoki boshqa)
-        client, name = get_best_api_client(engine_name=engine_name)
+        client, name = get_best_api_client(engine_name=engine_name, api_key=el_key)
         if client:
             return client, name
 

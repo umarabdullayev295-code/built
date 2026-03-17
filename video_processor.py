@@ -42,9 +42,15 @@ def extract_audio(
     audio_path = os.path.join(output_dir, audio_filename)
 
     try:
-        # Streamlit Cloud'da system ffmpeg path muammosi bo'lishi mumkinligi uchun
-        # to'g'ridan-to'g'ri moviepy (AudioFileClip/VideoFileClip) orqali yozamiz.
-        from moviepy.editor import AudioFileClip, VideoFileClip
+        # moviepy v2 compatibility
+        try:
+            from moviepy.editor import AudioFileClip, VideoFileClip
+        except (ImportError, ModuleNotFoundError):
+            try:
+                from moviepy.video.io.VideoFileClip import VideoFileClip
+                from moviepy.audio.io.AudioFileClip import AudioFileClip
+            except Exception as e:
+                return None, f"Kutubxona xatosi: {e} (moviepy o'rnatilmagan bo'lishi mumkin)"
 
         ext = os.path.splitext(video_path)[1].lower()
         is_audio = ext in [".mp3", ".wav", ".flac", ".ogg", ".m4a"]
@@ -55,7 +61,7 @@ def extract_audio(
                     audio_path,
                     fps=sample_rate,
                     nbytes=2,
-                    codec="libmp3lame" if format == "mp3" else "pcm_s16le",
+                    codec="pcm_s16le" if format == "wav" else "libmp3lame",
                     logger=None
                 )
         else:
@@ -92,14 +98,18 @@ def get_video_duration(video_path: str) -> Optional[float]:
         is_audio = ext in [".mp3", ".wav", ".m4a", ".ogg", ".flac"]
         
         if is_audio:
-            from moviepy.editor import AudioFileClip
+            try:
+                from moviepy.editor import AudioFileClip
+            except:
+                from moviepy.audio.io.AudioFileClip import AudioFileClip
+
             with AudioFileClip(video_path) as clip:
                 return float(clip.duration)
         else:
             try:
-                from moviepy.video.io.VideoFileClip import VideoFileClip
-            except ImportError:
                 from moviepy.editor import VideoFileClip
+            except:
+                from moviepy.video.io.VideoFileClip import VideoFileClip
             
             with VideoFileClip(video_path) as clip:
                 return float(clip.duration)
@@ -128,7 +138,11 @@ def get_video_info(video_path: str) -> dict:
         is_audio = ext in [".mp3", ".wav", ".m4a", ".ogg", ".flac"]
 
         if is_audio:
-            from moviepy.editor import AudioFileClip
+            try:
+                from moviepy.editor import AudioFileClip
+            except:
+                from moviepy.audio.io.AudioFileClip import AudioFileClip
+
             with AudioFileClip(video_path) as clip:
                 info["duration_sec"] = round(float(clip.duration), 2)
                 info["has_audio"] = True
@@ -136,9 +150,9 @@ def get_video_info(video_path: str) -> dict:
                 info["size"] = (0, 0)
         else:
             try:
-                from moviepy.video.io.VideoFileClip import VideoFileClip
-            except ImportError:
                 from moviepy.editor import VideoFileClip
+            except:
+                from moviepy.video.io.VideoFileClip import VideoFileClip
             
             with VideoFileClip(video_path) as clip:
                 info["duration_sec"] = round(float(clip.duration), 2)
