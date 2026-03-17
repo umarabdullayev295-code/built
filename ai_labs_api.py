@@ -132,24 +132,26 @@ class ElevenLabsClient:
     def _parse_response(self, result: dict) -> List[Dict]:
         """
         ElevenLabs API javobini standart segment formatiga o'tkazadi.
-        So'z darajasidagi vaqtlardan gap segmentlari yaratadi.
+        Scribe V2 da so'zlar 'words' ro'yxatida yoki 'segments' ichida bo'lishi mumkin.
         """
-        segments = []
+        all_words = []
 
-        # ElevenLabs words-based format
-        words = result.get("words", [])
-        if words:
-            segments = self._words_to_segments(words)
-        # Sodda text format (fallback)
-        elif "text" in result:
+        # 1. To'g'ridan-to'g'ri 'words' ro'yxati (agar mavjud bo'lsa)
+        if "words" in result:
+            all_words = result["words"]
+        
+        # 2. 'segments' ichidagi so'zlarni yig'ish (Scribe V2 odatiy formati)
+        elif "segments" in result:
+            for seg in result["segments"]:
+                seg_words = seg.get("words", [])
+                all_words.extend(seg_words)
+
+        # Matnli fallback
+        if not all_words and "text" in result:
             raw_text = str(result.get("text", "")).strip()
-            segments = [{
-                "start": 0.0,
-                "end": 0.0,
-                "text": raw_text,
-            }]
+            return [{"start": 0.0, "end": 0.0, "text": raw_text}]
 
-        return [s for s in segments if s.get("text", "").strip()]
+        return self._words_to_segments(all_words)
 
     def _words_to_segments(self, words: list) -> List[Dict]:
         """

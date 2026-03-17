@@ -86,7 +86,7 @@ def render_youtube_player(video_path: str, segments: List[Dict], start_time: flo
         }}
 
         .caption-box {{
-            background: rgba(0, 0, 0, 0.7); /* YouTube-style semi-transparent black */
+            background: rgba(0, 0, 0, 0.7);
             padding: 8px 20px;
             border-radius: 4px;
             max-width: 90%;
@@ -101,12 +101,12 @@ def render_youtube_player(video_path: str, segments: List[Dict], start_time: flo
             display: inline-block;
             font-family: 'Roboto', 'Inter', sans-serif;
             font-size: 1.6rem;
-            color: rgba(255, 255, 255, 0.4); /* Dim white for context */
+            color: rgba(255, 255, 255, 0.4);
             margin: 0 5px;
             transition: all 0.1s ease;
             font-weight: 500;
             text-shadow: 2px 2px 4px rgba(0,0,0,0.5);
-            opacity: 0; /* Initially hidden */
+            opacity: 0;
             transform: translateY(5px);
         }}
 
@@ -117,12 +117,14 @@ def render_youtube_player(video_path: str, segments: List[Dict], start_time: flo
 
         .word.active {{
             color: #ffffff;
-            font-weight: 700;
-            transform: scale(1.1);
-            text-shadow: 0 0 10px rgba(255,255,255,0.5);
+            font-weight: 900;
+            transform: scale(1.2) translateY(-2px);
+            text-shadow: 0 0 20px rgba(255,255,255,0.8), 
+                         0 0 10px rgba(255,255,255,1),
+                         2px 2px 4px rgba(0,0,0,0.8);
+            z-index: 10;
         }}
 
-        /* ── Mobile Responsiveness ── */
         @media (max-width: 768px) {{
             .subtitle-overlay {{
                 bottom: 12%;
@@ -152,8 +154,24 @@ def render_youtube_player(video_path: str, segments: List[Dict], start_time: flo
 
     <script>
         const media = document.getElementById('mainMedia');
-        const words = document.querySelectorAll('.word');
+        const words = Array.from(document.querySelectorAll('.word'));
         const captionBox = document.getElementById('captionBox');
+
+        const phrases = [];
+        let currentPhrase = [];
+        
+        words.forEach((w, index) => {{
+            const start = parseFloat(w.dataset.start);
+            const prevEnd = currentPhrase.length > 0 ? parseFloat(currentPhrase[currentPhrase.length-1].dataset.end) : 0;
+            
+            if (index > 0 && (start - prevEnd > 0.8 || currentPhrase.length >= 10)) {{
+                phrases.push(currentPhrase);
+                currentPhrase = [w];
+            }} else {{
+                currentPhrase.push(w);
+            }}
+        }});
+        if (currentPhrase.length > 0) phrases.push(currentPhrase);
 
         media.addEventListener('loadedmetadata', () => {{
             media.currentTime = {start_time};
@@ -165,58 +183,52 @@ def render_youtube_player(video_path: str, segments: List[Dict], start_time: flo
 
         function updateSubtitles() {{
             const ct = media.currentTime;
-            
-            words.forEach((w, index) => {{
-                const start = parseFloat(w.dataset.start);
-                const end = parseFloat(w.dataset.end);
+            let activePhrase = null;
 
-                // Word is ACTIVE if current time is within its bounds
-                if (ct >= start && ct <= end) {{
-                    w.classList.add('active');
-                    w.classList.add('visible');
-                    w.style.display = 'inline-block';
-                }} else if (ct > end) {{
-                    // Word has passed - keep visible but not active
-                    w.classList.remove('active');
-                    w.classList.add('visible');
-                    // Hide words that are too old (e.g., more than 4 seconds ago)
-                    if (ct - end > 4.0) {{
-                        w.style.display = 'none';
-                    }} else {{
-                        w.style.display = 'inline-block';
-                    }}
-                }} else if (ct < start) {{
-                    // Word is in the future
-                    w.classList.remove('active');
-                    w.classList.remove('visible');
-                    w.style.display = 'none';
+            for (const phrase of phrases) {{
+                const phraseStart = parseFloat(phrase[0].dataset.start);
+                const phraseEnd = parseFloat(phrase[phrase.length-1].dataset.end);
+                
+                if (ct >= phraseStart - 0.2 && ct <= phraseEnd + 0.5) {{
+                    activePhrase = phrase;
+                    break;
                 }}
-            }});
+            }}
+
+            words.forEach(w => w.style.display = 'none');
+            
+            if (activePhrase) {{
+                captionBox.style.display = 'flex';
+                activePhrase.forEach(w => {{
+                    w.style.display = 'inline-block';
+                    w.classList.add('visible');
+                    
+                    const start = parseFloat(w.dataset.start);
+                    const end = parseFloat(w.dataset.end);
+                    
+                    if (ct >= start && ct <= end) {{
+                        w.classList.add('active');
+                    }} else {{
+                        w.classList.remove('active');
+                    }}
+                }});
+            }} else {{
+                captionBox.style.display = 'none';
+            }}
 
             requestAnimationFrame(updateSubtitles);
         }}
 
-        // Start the loop
         requestAnimationFrame(updateSubtitles);
-
         media.addEventListener('seeked', updateSubtitles);
 
-        // Click to jump
         words.forEach(w => {{
-            w.style.pointerEvents = 'auto'; // Re-enable pointer events for words
+            w.style.pointerEvents = 'auto';
             w.addEventListener('click', () => {{
                 media.currentTime = parseFloat(w.dataset.start);
                 media.play();
             }});
         }});
-
-        // Python'dan vaqt sovg'asi (agar kerak bo'lsa)
-        // window.addEventListener('message', function(event) {{
-        //     if (event.data.type === 'seek') {{
-        //         media.currentTime = event.data.time;
-        //         media.play();
-        //     }}
-        // }});
     </script>
     """
     
