@@ -443,15 +443,13 @@ with col_theme:
     st.write("")
     st.write("")
     
-    # Kichkina Deploy va Mavzu tugmalari
-    c1, c2, c3 = st.columns([0.4, 0.3, 0.3])
+    # Kichkina Mavzu tugmalari
+    c1, c2 = st.columns([0.5, 0.5])
     with c1:
-        st.link_button("🚀 Deploy", "https://github.com/umarabdullayev295-code/built", help="GitHub sahifasiga o'tish")
-    with c2:
         if st.button("☀️", key="theme_l", help="Light Mode"):
             st.session_state.theme = "light"
             st.rerun()
-    with c3:
+    with c2:
         if st.button("🌙", key="theme_d", help="Dark Mode"):
             st.session_state.theme = "dark"
             st.rerun()
