@@ -63,12 +63,12 @@ class SpeechToText:
 
         # 1. Muxlisa AI
         if "Muxlisa" in engine_name:
-            client, name = get_best_api_client(engine_name="Muxlisa", api_key=el_key)
+            client, name = get_best_api_client(engine_name="Muxlisa")
             if client:
                 return client, name
 
         # 2. Fallback: Avtomatik tanlash (Muxlisa yoki boshqa)
-        client, name = get_best_api_client(engine_name=engine_name, api_key=el_key)
+        client, name = get_best_api_client(engine_name=engine_name)
         if client:
             return client, name
 
@@ -123,8 +123,8 @@ class SpeechToText:
 
             # 2. Whisper (Tezkor lekin aniq) orqali vaqtlarni aniqlash
             orig_size = self.whisper_model_size
-            # Cloud uchun 'tiny' (kam xotira), lokal uchun 'small' ishlatiladi
-            self.whisper_model_size = "tiny" 
+            # 'small' o'zbek tili uchun 'base' dan ancha aniqroq
+            self.whisper_model_size = "small" 
             whisper_results = self._transcribe_whisper(audio_path)
             self.whisper_model_size = orig_size # Asliga qaytaramiz
 
@@ -269,13 +269,3 @@ class SpeechToText:
 
     def get_full_text(self, segments: List[Dict]) -> str:
         return " ".join(s["text"] for s in segments if s.get("text"))
-
-    def cleanup(self):
-        """Whisper modelini va API clientni xotiradan tozalaydi (RAM bo'shatish)."""
-        if self._whisper_model is not None:
-            del self._whisper_model
-            self._whisper_model = None
-            print("[STT] Whisper modeli xotiradan o'chirildi.")
-        if self._api_client is not None:
-            del self._api_client
-            self._api_client = None

@@ -10,12 +10,8 @@ import tempfile
 import time
 import random
 from typing import List, Dict, Optional
+from elevenlabs.client import ElevenLabs
 import httpx
-
-try:
-    from elevenlabs.client import ElevenLabs
-except ImportError:
-    ElevenLabs = None
 
 # Local components
 try:
@@ -36,7 +32,7 @@ class ElevenLabsClient:
 
     def __init__(self, api_key: str = None):
         self.api_key = api_key or os.environ.get("ELEVENLABS_API_KEY")
-        self.available = bool(self.api_key) and (ElevenLabs is not None)
+        self.available = bool(self.api_key)
 
     def _simulate_human_usage(self):
         """Simulates human-like behavior with natural pauses between requests."""
@@ -69,10 +65,6 @@ class ElevenLabsClient:
         iso3_lang = lang_map.get(language, "uzb")
 
         try:
-            if ElevenLabs is None:
-                print("[AI Engine] ElevenLabs kutubxonasi o'rnatilmagan yoki yuklanmadi.")
-                return []
-                
             client = ElevenLabs(api_key=self.api_key)
             with open(audio_path, "rb") as audio_file:
                 response = client.speech_to_text.convert(
@@ -106,10 +98,6 @@ class ElevenLabsClient:
         self._simulate_human_usage()
 
         try:
-            if ElevenLabs is None:
-                print("[AI Engine] ElevenLabs kutubxonasi o'rnatilmagan.")
-                return None
-                
             client = ElevenLabs(api_key=self.api_key)
             audio_generator = client.generate(
                 text=text,
@@ -132,26 +120,36 @@ class ElevenLabsClient:
     def _parse_response(self, result: dict) -> List[Dict]:
         """
         ElevenLabs API javobini standart segment formatiga o'tkazadi.
-        Scribe V2 da so'zlar 'words' ro'yxatida yoki 'segments' ichida bo'lishi mumkin.
+        So'z darajasidagi vaqtlardan gap segmentlari yaratadi.
         """
-        all_words = []
+        segments = []
 
-        # 1. To'g'ridan-to'g'ri 'words' ro'yxati (agar mavjud bo'lsa)
-        if "words" in result:
-            all_words = result["words"]
-        
-        # 2. 'segments' ichidagi so'zlarni yig'ish (Scribe V2 odatiy formati)
-        elif "segments" in result:
+        # 1. Scribe V2 format — segments -> words
+        if "segments" in result:
             for seg in result["segments"]:
-                seg_words = seg.get("words", [])
-                all_words.extend(seg_words)
-
-        # Matnli fallback
-        if not all_words and "text" in result:
+                for w in seg.get("words", []):
+                    word_text = w.get("text", "").strip()
+                    if word_text:
+                        segments.append({
+                            "start": float(w.get("start", 0)),
+                            "end": float(w.get("end", 0)),
+                            "text": word_text
+                        })
+        
+        # 2. Direct words format (Legacy or other models)
+        elif "words" in result:
+            segments = self._words_to_segments(result["words"])
+            
+        # 3. Fallback to full text if no words/segments
+        elif "text" in result:
             raw_text = str(result.get("text", "")).strip()
-            return [{"start": 0.0, "end": 0.0, "text": raw_text}]
+            segments = [{
+                "start": 0.0,
+                "end": 0.0,
+                "text": raw_text,
+            }]
 
-        return self._words_to_segments(all_words)
+        return [s for s in segments if s.get("text", "").strip()]
 
     def _words_to_segments(self, words: list) -> List[Dict]:
         """
@@ -236,7 +234,7 @@ class MuxlisaClient:
         return bool(self.api_key)
 
 
-def get_best_api_client(engine_name: str = "ElevenLabs", api_key: str = None):
+def get_best_api_client(engine_name: str = "ElevenLabs"):
     """
     Mavjud eng yaxshi API mijozini qaytaradi.
     """
@@ -245,16 +243,15 @@ def get_best_api_client(engine_name: str = "ElevenLabs", api_key: str = None):
         if muxlisa.is_available():
             return muxlisa, "Muxlisa AI (Pro)"
             
-    if "ElevenLabs" in engine_name or "Noiz" in engine_name:
-        elevenlabs = ElevenLabsClient(api_key=api_key)
+    if "Noiz AI" in engine_name:
+        # Noiz AI STT hozircha ElevenLabs fallback sifatida
+        elevenlabs = ElevenLabsClient()
         if elevenlabs.is_available():
-            name = "ElevenLabs (Premium)" if "ElevenLabs" in engine_name else "Noiz AI (Professional)"
-            return elevenlabs, name
+            return elevenlabs, "Noiz AI (Professional)"
 
-    # Fallback to general checking
-    elevenlabs = ElevenLabsClient(api_key=api_key)
+    elevenlabs = ElevenLabsClient()
     if elevenlabs.is_available():
-        return elevenlabs, "ElevenLabs (Premium)"
+        name = "My AI (Premium)" if "My AI" in engine_name else "O'zbek AI Model (Pro)"
+        return elevenlabs, name
 
     return None, None
-

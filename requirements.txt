@@ -1,26 +1,6 @@
-# Core web framework
 streamlit
-
-# Video/Audio processing
 moviepy
-
-# Speech-to-text
 faster-whisper
-
-# Semantic Search & Vectors
-faiss-cpu
-sentence-transformers
-
-# HTTP client
 httpx
-
-# ElevenLabs STT & TTS
-elevenlabs
-
-# Environment variable management
 python-dotenv
-
-# Subtitles and Audio processing
-srt
-soundfile
-numpy
+python-srt

@@ -40,7 +40,7 @@ def init_state():
         "last_results": [],
         "engine_name": "",
         "video_duration": 0,
-        "elevenlabs_key": os.environ.get("ELEVENLABS_API_KEY") or (st.secrets.get("ELEVENLABS_API_KEY", "") if hasattr(st, "secrets") else ""),
+        "elevenlabs_key": os.environ.get("ELEVENLABS_API_KEY", ""),
         "whisper_model": "medium",
         "target_lang": "uz",
         "theme": "dark",
@@ -387,72 +387,18 @@ div[data-testid="stRadio"] label {{
 .stat-value {{ font-size: 1.2rem; font-weight: 800; color: var(--primary-color); }}
 .stat-label {{ font-size: 0.7rem; color: var(--text-color); opacity: 0.6; text-transform: uppercase; margin-top: 0.2rem; }}
 
-/* ── Mobile Responsiveness ── */
-@media (max-width: 768px) {{
-    .main-header {{
-        padding: 2rem 0;
-    }}
-    .main-header h1 {{
-        font-size: 2.5rem !important;
-        letter-spacing: -1px;
-    }}
-    .main-header p {{
-        font-size: 1.1rem;
-    }}
-    .info-banner {{
-        padding: 1.5rem;
-    }}
-    .info-banner h3 {{
-        font-size: 1.4rem !important;
-    }}
-    .result-card {{
-        padding: 1rem;
-    }}
-    .score-badge {{
-        padding: 0.3rem 0.8rem;
-        font-size: 0.7rem;
-    }}
-    /* Make stat grid stack on very small screens */
-    .stat-grid {{
-        grid-template-columns: 1fr;
-    }}
-    /* Adjust Streamlit button padding */
-    .stButton > button {{
-        padding: 0.5rem 1rem !important;
-        font-size: 0.95rem !important;
-    }}
-}}
-
 </style>
 """, unsafe_allow_html=True)
 
 # ─────────────────────────────────────────────
 # HEADER
 # ─────────────────────────────────────────────
-col_title, col_theme = st.columns([8, 2])
-with col_title:
-    st.markdown("""
-    <div class="main-header">
-        <h1>🎬 Video AI Search</h1>
-        <p>Videodan Matn va audio orqali aqlli qidiruv tizimi</p>
-    </div>
-    """, unsafe_allow_html=True)
-
-with col_theme:
-    st.write("") # Bo'sh joy qo'shish (hizslash uchun)
-    st.write("")
-    st.write("")
-    
-    # Kichkina Mavzu tugmalari
-    c1, c2 = st.columns([0.5, 0.5])
-    with c1:
-        if st.button("☀️", key="theme_l", help="Light Mode"):
-            st.session_state.theme = "light"
-            st.rerun()
-    with c2:
-        if st.button("🌙", key="theme_d", help="Dark Mode"):
-            st.session_state.theme = "dark"
-            st.rerun()
+st.markdown("""
+<div class="main-header">
+    <h1>🎬 Video AI Search</h1>
+    <p>Videodan Matn va audio orqali aqlli qidiruv tizimi</p>
+</div>
+""", unsafe_allow_html=True)
 
 # ─────────────────────────────────────────────
 # SIDEBAR — Sozlamalar va Video yuklash
@@ -477,23 +423,23 @@ with st.sidebar:
         
         engine_choice = st.selectbox(
             "Transkripsiya modeli:",
-            ["Muxlisa AI (Pro)", "ElevenLabs (Premium)", "Whisper (Asosiy)"],
+            ["Muxlisa AI (Pro)", "Whisper (Asosiy)"],
             index=0 if st.session_state.target_lang == "uz" else 1,
-            help="O'zbek tili uchun 'Muxlisa AI' tavsiya etiladi. Boshqa tillar uchun 'ElevenLabs' yoki 'Whisper' tanlang.",
+            help="O'zbek tili uchun 'Muxlisa AI' tavsiya etiladi. Boshqa tillar uchun 'Asosiy' model ishonchliroq.",
         )
 
         if engine_choice == "Muxlisa AI (Pro)":
             st.success("🛰️ Muxlisa AI (National) faol. O'zbek tili bo'yicha mutaxassis model.")
-        elif engine_choice == "ElevenLabs (Premium)":
-            st.success("🌍 ElevenLabs Scribe v2 faol. 100+ tilni qo'llab-quvvatlaydi.")
         else:
             st.session_state.whisper_model = st.selectbox(
                 "Whisper model hajmi:",
-                ["tiny", "base", "small", "medium", "large"],
-                index=0, # Default to tiny for Streamlit Cloud Memory Limits
-                help="Kattaroq model = aniqroq natija, lekin sekinroq va ko'p xotira (RAM) talab qiladi",
+                ["tiny", "base", "small", "medium", "large-v2", "large-v3"],
+                index=["tiny", "base", "small", "medium", "large-v2", "large-v3"].index(
+                    st.session_state.whisper_model
+                ),
+                help="Kattaroq model = aniqroq natija, lekin sekinroq",
             )
-            st.info("💡 Cloud xosting uchun `tiny` yoki `base` tavsiya etiladi (xotira cheklangan).")
+            st.info("💡 O'zbek tili uchun `medium` yoki `large-v2` tavsiya etiladi.")
 
 
     st.markdown("---")
@@ -564,6 +510,16 @@ with st.sidebar:
                 st.write(f"Davomiylik: {m}:{s:02d}")
 
     st.markdown("---")
+    col_l, col_d = st.columns(2)
+    with col_l:
+        if st.button("☀️ Light", use_container_width=True, key="light_btn"):
+            st.session_state.theme = "light"
+            st.rerun()
+    with col_d:
+        if st.button("🌙 Dark", use_container_width=True, key="dark_btn"):
+            st.session_state.theme = "dark"
+            st.rerun()
+
     st.markdown("""
     <div style="text-align:center; padding-top: 0.5rem;">
         <div style="color:#8b949e; font-size:0.75rem; font-weight: 500;">
@@ -600,10 +556,10 @@ if st.session_state.processing and st.session_state.video_path:
         status_text.markdown("**2/4** 🔊 Audio ajratilmoqda (Tezkor rejim)...")
         progress_bar.progress(25)
         from video_processor import extract_audio
-        audio_path, err_msg = extract_audio(video_path, format="mp3", sample_rate=16000)
+        audio_path = extract_audio(video_path, format="mp3", sample_rate=16000)
 
         if not audio_path:
-            st.error(f"❌ Audio ajratish xatosi:\n\n`{err_msg}`\n\nVideo faylda audio trek mavjudligini yoki format to'g'riligini tekshiring.")
+            st.error("❌ Audio ajratib bo'lmadi. Video fayldа audio trek mavjudligini tekshiring.")
             st.stop()
 
         progress_bar.progress(40)
@@ -616,8 +572,8 @@ if st.session_state.processing and st.session_state.video_path:
         stt = SpeechToText(
             whisper_model_size=st.session_state.whisper_model,
             language=st.session_state.target_lang,
-            use_api=(engine_choice in ["Muxlisa AI (Pro)", "ElevenLabs (Premium)"]),
-            elevenlabs_api_key=st.session_state.elevenlabs_key or None,
+            use_api=(engine_choice in ["Muxlisa AI (Pro)"]),
+            elevenlabs_api_key=None,
             engine_name=engine_choice
         )
         st.session_state.stt_engine = stt
@@ -625,13 +581,6 @@ if st.session_state.processing and st.session_state.video_path:
 
         segments = stt.transcribe(audio_path)
         st.session_state.segments = segments
-
-        # Whisper modelini xotiradan tozalash (RAM tejash)
-        stt.cleanup()
-        st.session_state.stt_engine = None
-        import gc
-        gc.collect()
-        print("[App] Whisper modeli xotiradan tozalandi. RAM bo'shatildi.")
 
         # Temp audio faylni o'chirish
         from utils import cleanup_file
@@ -920,20 +869,13 @@ else:
 
         # Initialize tts_engine if not already in session state
         if "tts_engine" not in st.session_state:
-            st.session_state.tts_engine = "ElevenLabs" # Default value
+            st.session_state.tts_engine = "Muxlisa" # Default value
 
         st.markdown("### 🗣️ Matnni nutqqa aylantirish (TTS)")
-        tts_options = ["Muxlisa AI", "ElevenLabs (Premium)", "Whisper (Asosiy)"]
-        default_idx = 0
-        if "ElevenLabs" in getattr(st.session_state, "tts_engine", ""):
-            default_idx = 1
-        elif "Whisper" in getattr(st.session_state, "tts_engine", ""):
-            default_idx = 2
-            
-        st.session_state.tts_engine = st.selectbox(
+        st.session_state.tts_engine = st.radio(
             "TTS Motorini tanlang:",
-            tts_options,
-            index=default_idx,
+            ["Muxlisa", "Whisper"],
+            index=0 if st.session_state.tts_engine == "Muxlisa" else 1,
             help="Nutq generatsiya qilish uchun modelni tanlang."
         )
 

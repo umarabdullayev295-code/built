@@ -17,7 +17,7 @@ def extract_audio(
     output_dir: Optional[str] = None,
     format: str = "wav",
     sample_rate: int = 16000,
-) -> Tuple[Optional[str], Optional[str]]:
+) -> Optional[str]:
     """
     Video fayldan audio ajratib oladi.
 
@@ -31,7 +31,8 @@ def extract_audio(
         Audio fayl yo'li yoki None (xato bo'lsa)
     """
     if not os.path.exists(video_path):
-        return None, f"Fayl topilmadi: {video_path}"
+        print(f"[VideoProcessor] Fayl topilmadi: {video_path}")
+        return None
 
     if output_dir is None:
         output_dir = tempfile.mkdtemp(prefix="video_ai_")
@@ -42,51 +43,55 @@ def extract_audio(
     audio_path = os.path.join(output_dir, audio_filename)
 
     try:
-        # moviepy v2 compatibility
-        try:
-            from moviepy.editor import AudioFileClip, VideoFileClip
-        except (ImportError, ModuleNotFoundError):
-            try:
-                from moviepy.video.io.VideoFileClip import VideoFileClip
-                from moviepy.audio.io.AudioFileClip import AudioFileClip
-            except Exception as e:
-                return None, f"Kutubxona xatosi: {e} (moviepy o'rnatilmagan bo'lishi mumkin)"
+        from moviepy.video.io.ffmpeg_tools import ffmpeg_extract_audio
+        import subprocess
 
+        # Check if ffmpeg is available
+        import shutil
+        if not shutil.which("ffmpeg"):
+            print("[VideoProcessor] ERROR: ffmpeg NOT FOUND in system path!")
+            return None
+
+        # Video yoki faqat audio fayl ekanligini aniqlash
         ext = os.path.splitext(video_path)[1].lower()
-        is_audio = ext in [".mp3", ".wav", ".flac", ".ogg", ".m4a"]
-
-        if is_audio:
-            with AudioFileClip(video_path) as clip:
-                clip.write_audiofile(
-                    audio_path,
-                    fps=sample_rate,
-                    nbytes=2,
-                    codec="pcm_s16le" if format == "wav" else "libmp3lame",
-                    logger=None
-                )
+        if ext in [".mp3", ".wav", ".flac", ".ogg", ".m4a"]:
+            # To'g'ridan-to'g'ri audio fayl bo'lsa, ffmpeg orqali konvertatsiya
+            cmd = [
+                "ffmpeg", "-y", "-i", video_path,
+                "-ac", "1", "-ar", str(sample_rate)
+            ]
+            if format == "mp3":
+                cmd.extend(["-codec:a", "libmp3lame", "-b:a", "64k"])
+            cmd.append(audio_path)
+            result = subprocess.run(cmd, capture_output=True, text=True)
+            if result.returncode != 0:
+                print(f"[VideoProcessor] Ffmpeg convert error: {result.stderr}")
+                return None
         else:
-            with VideoFileClip(video_path) as clip:
-                if clip.audio is None:
-                    return None, "Videoda audio trek mavjud emas."
-                    
-                clip.audio.write_audiofile(
-                    audio_path,
-                    fps=sample_rate,
-                    nbytes=2,
-                    codec="libmp3lame" if format == "mp3" else "pcm_s16le",
-                    logger=None
-                )
+            # Video fayldan audio ajratish
+            cmd = [
+                "ffmpeg", "-y", "-i", video_path,
+                "-vn", "-ac", "1", "-ar", str(sample_rate)
+            ]
+            if format == "mp3":
+                cmd.extend(["-codec:a", "libmp3lame", "-b:a", "64k"])
+            cmd.append(audio_path)
+            
+            result = subprocess.run(cmd, capture_output=True, text=True)
+            if result.returncode != 0:
+                print(f"[VideoProcessor] Ffmpeg extraction error: {result.stderr}")
+                return None
 
-        print(f"[VideoProcessor] Audio ajratildi (MoviePy): {audio_path}")
-        return audio_path, None
+        print(f"[VideoProcessor] Audio ajratildi (Tezkor STT rejim): {audio_path}")
+        return audio_path
 
-    except ImportError as e:
-        return None, f"Kutubxona xatosi: {e} (moviepy o'rnatilmagan bo'lishi mumkin)"
+    except ImportError:
+        print("[VideoProcessor] moviepy o'rnatilmagan. Quyidagi buyruqni bajaring:")
+        print("  pip install moviepy")
+        return None
     except Exception as e:
-        import traceback
-        err_trace = traceback.format_exc()
-        print(f"[VideoProcessor] Audio ajratishda xato:\n{err_trace}")
-        return None, str(e)
+        print(f"[VideoProcessor] Audio ajratishda xato: {e}")
+        return None
 
 
 def get_video_duration(video_path: str) -> Optional[float]:
@@ -98,18 +103,14 @@ def get_video_duration(video_path: str) -> Optional[float]:
         is_audio = ext in [".mp3", ".wav", ".m4a", ".ogg", ".flac"]
         
         if is_audio:
-            try:
-                from moviepy.editor import AudioFileClip
-            except:
-                from moviepy.audio.io.AudioFileClip import AudioFileClip
-
+            from moviepy.editor import AudioFileClip
             with AudioFileClip(video_path) as clip:
                 return float(clip.duration)
         else:
             try:
-                from moviepy.editor import VideoFileClip
-            except:
                 from moviepy.video.io.VideoFileClip import VideoFileClip
+            except ImportError:
+                from moviepy.editor import VideoFileClip
             
             with VideoFileClip(video_path) as clip:
                 return float(clip.duration)
@@ -138,11 +139,7 @@ def get_video_info(video_path: str) -> dict:
         is_audio = ext in [".mp3", ".wav", ".m4a", ".ogg", ".flac"]
 
         if is_audio:
-            try:
-                from moviepy.editor import AudioFileClip
-            except:
-                from moviepy.audio.io.AudioFileClip import AudioFileClip
-
+            from moviepy.editor import AudioFileClip
             with AudioFileClip(video_path) as clip:
                 info["duration_sec"] = round(float(clip.duration), 2)
                 info["has_audio"] = True
@@ -150,9 +147,9 @@ def get_video_info(video_path: str) -> dict:
                 info["size"] = (0, 0)
         else:
             try:
-                from moviepy.editor import VideoFileClip
-            except:
                 from moviepy.video.io.VideoFileClip import VideoFileClip
+            except ImportError:
+                from moviepy.editor import VideoFileClip
             
             with VideoFileClip(video_path) as clip:
                 info["duration_sec"] = round(float(clip.duration), 2)

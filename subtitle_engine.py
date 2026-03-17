@@ -42,12 +42,12 @@ def render_youtube_player(video_path: str, segments: List[Dict], start_time: flo
     # HTML/CSS/JS Component
     html_code = f"""
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800;900&display=swap');
         
         body {{
             margin: 0;
             padding: 0;
-            background: #000;
+            background: transparent;
             font-family: 'Inter', sans-serif;
             overflow: hidden;
             display: flex;
@@ -63,6 +63,9 @@ def render_youtube_player(video_path: str, segments: List[Dict], start_time: flo
             display: flex;
             flex-direction: column;
             background: #000;
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: 0 20px 50px rgba(0,0,0,0.5);
         }}
 
         {tag} {{
@@ -75,7 +78,7 @@ def render_youtube_player(video_path: str, segments: List[Dict], start_time: flo
 
         .subtitle-overlay {{
             position: absolute;
-            bottom: 15%;
+            bottom: 12%;
             left: 0;
             right: 0;
             text-align: center;
@@ -83,29 +86,33 @@ def render_youtube_player(video_path: str, segments: List[Dict], start_time: flo
             pointer-events: none;
             display: flex;
             justify-content: center;
+            padding: 0 20px;
         }}
 
         .caption-box {{
-            background: rgba(0, 0, 0, 0.7);
-            padding: 8px 20px;
-            border-radius: 4px;
+            background: rgba(0, 0, 0, 0.75);
+            backdrop-filter: blur(8px);
+            padding: 10px 20px;
+            border-radius: 12px;
             max-width: 90%;
-            display: flex;
+            display: none;
             flex-wrap: wrap;
             justify-content: center;
             align-items: center;
-            min-height: 2em;
+            border: 1px solid rgba(255,255,255,0.1);
+            transition: all 0.3s ease;
         }}
 
         .word {{
-            display: inline-block;
-            font-family: 'Roboto', 'Inter', sans-serif;
-            font-size: 1.6rem;
-            color: rgba(255, 255, 255, 0.4);
+            display: none;
+            font-size: 1.3rem;
+            color: rgba(255, 255, 255, 0.6);
             margin: 0 5px;
-            transition: all 0.1s ease;
-            font-weight: 500;
-            text-shadow: 2px 2px 4px rgba(0,0,0,0.5);
+            transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+            font-weight: 600;
+            cursor: pointer;
+            pointer-events: auto;
+            display: inline-block;
             opacity: 0;
             transform: translateY(5px);
         }}
@@ -195,7 +202,10 @@ def render_youtube_player(video_path: str, segments: List[Dict], start_time: flo
                 }}
             }}
 
-            words.forEach(w => w.style.display = 'none');
+            words.forEach(w => {{
+                w.style.display = 'none';
+                w.classList.remove('active', 'visible');
+            }});
             
             if (activePhrase) {{
                 captionBox.style.display = 'flex';
@@ -208,8 +218,6 @@ def render_youtube_player(video_path: str, segments: List[Dict], start_time: flo
                     
                     if (ct >= start && ct <= end) {{
                         w.classList.add('active');
-                    }} else {{
-                        w.classList.remove('active');
                     }}
                 }});
             }} else {{
@@ -223,7 +231,6 @@ def render_youtube_player(video_path: str, segments: List[Dict], start_time: flo
         media.addEventListener('seeked', updateSubtitles);
 
         words.forEach(w => {{
-            w.style.pointerEvents = 'auto';
             w.addEventListener('click', () => {{
                 media.currentTime = parseFloat(w.dataset.start);
                 media.play();
