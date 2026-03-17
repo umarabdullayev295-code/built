@@ -14,7 +14,7 @@ def get_video_b64(video_path: str) -> str:
     except Exception as e:
         return ""
 
-def render_youtube_player(video_path: str, segments: List[Dict], start_time: float = 0.0, autoplay: bool = False):
+def render_youtube_player(video_path: str, segments: List[Dict], start_time: float = 0.0):
     """
     YouTube uslubidagi word-by-word subtitrli video player.
     Subtitrlar video tagida, real-vaqtda yonib turadi.
@@ -153,12 +153,10 @@ def render_youtube_player(video_path: str, segments: List[Dict], start_time: flo
 
         media.addEventListener('loadedmetadata', () => {{
             media.currentTime = {start_time};
-            { "media.play();" if autoplay else "" }
         }});
         
         if (media.readyState >= 1) {{
             media.currentTime = {start_time};
-            { "media.play();" if autoplay else "" }
         }}
 
         let rafId = null;

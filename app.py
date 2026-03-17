@@ -45,7 +45,6 @@ def init_state():
         "target_lang": "uz",
         "theme": "dark",
         "tts_engine": "Muxlisa",
-        "autoplay": False,
     }
     for k, v in defaults.items():
         if k not in st.session_state:
@@ -789,7 +788,6 @@ else:
             # Agar kamida bitta natija bo'lsa, avtomatik birinchi natija vaqtiga o'tkazish
             if results and len(results) > 0:
                 st.session_state.play_timestamp = float(results[0]["start"])
-                st.session_state.autoplay = True
                 st.rerun()
 
         if st.session_state.last_results:
@@ -821,7 +819,6 @@ else:
 
                 if st.button(f"▶ {start_fmt} dan ijro etish", key=f"play_{i}_{start_fmt}"):
                     st.session_state.play_timestamp = float(res["start"])
-                    st.session_state.autoplay = True
                     st.rerun()
 
         elif st.session_state.last_results == [] and perform_search:
@@ -855,19 +852,15 @@ else:
                 if is_audio:
                     if st.session_state.segments:
                         from subtitle_engine import render_youtube_player
-                        render_youtube_player(st.session_state.video_path, st.session_state.segments, start_time=start_time, autoplay=st.session_state.autoplay)
+                        render_youtube_player(st.session_state.video_path, st.session_state.segments, start_time=start_time)
                     else:
-                        st.audio(st.session_state.video_path, start_time=start_time, autoplay=st.session_state.autoplay)
+                        st.audio(st.session_state.video_path, start_time=start_time)
                 else:
                     if st.session_state.segments:
                         from subtitle_engine import render_youtube_player
-                        render_youtube_player(st.session_state.video_path, st.session_state.segments, start_time=start_time, autoplay=st.session_state.autoplay)
+                        render_youtube_player(st.session_state.video_path, st.session_state.segments, start_time=start_time)
                     else:
-                        st.video(st.session_state.video_path, start_time=start_time, autoplay=st.session_state.autoplay)
-                
-                # Qayta o'chiramiz, tokik keyingi marta o'z-o'zidan play bo'lmasin
-                if st.session_state.autoplay:
-                    st.session_state.autoplay = False
+                        st.video(st.session_state.video_path, start_time=start_time)
             except Exception as e:
                 st.error(f"Media yuklashda xato: {e}")
 
