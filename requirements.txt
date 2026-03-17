@@ -8,7 +8,7 @@ moviepy>=1.0.3
 faster-whisper>=1.0.0
 
 # Semantic Search & Vectors
-faiss-cpu>=1.8.0
+faiss-cpu
 sentence-transformers>=2.6.0
 
 # HTTP client for Muxlisa AI API
