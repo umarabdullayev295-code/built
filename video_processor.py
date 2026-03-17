@@ -43,46 +43,37 @@ def extract_audio(
     audio_path = os.path.join(output_dir, audio_filename)
 
     try:
-        from moviepy.video.io.ffmpeg_tools import ffmpeg_extract_audio
-        import subprocess
+        # Streamlit Cloud'da system ffmpeg path muammosi bo'lishi mumkinligi uchun
+        # to'g'ridan-to'g'ri moviepy (AudioFileClip/VideoFileClip) orqali yozamiz.
+        from moviepy.editor import AudioFileClip, VideoFileClip
 
-        # Check if ffmpeg is available
-        import shutil
-        if not shutil.which("ffmpeg"):
-            print("[VideoProcessor] ERROR: ffmpeg NOT FOUND in system path!")
-            return None
-
-        # Video yoki faqat audio fayl ekanligini aniqlash
         ext = os.path.splitext(video_path)[1].lower()
-        if ext in [".mp3", ".wav", ".flac", ".ogg", ".m4a"]:
-            # To'g'ridan-to'g'ri audio fayl bo'lsa, ffmpeg orqali konvertatsiya
-            cmd = [
-                "ffmpeg", "-y", "-i", video_path,
-                "-ac", "1", "-ar", str(sample_rate)
-            ]
-            if format == "mp3":
-                cmd.extend(["-codec:a", "libmp3lame", "-b:a", "64k"])
-            cmd.append(audio_path)
-            result = subprocess.run(cmd, capture_output=True, text=True)
-            if result.returncode != 0:
-                print(f"[VideoProcessor] Ffmpeg convert error: {result.stderr}")
-                return None
-        else:
-            # Video fayldan audio ajratish
-            cmd = [
-                "ffmpeg", "-y", "-i", video_path,
-                "-vn", "-ac", "1", "-ar", str(sample_rate)
-            ]
-            if format == "mp3":
-                cmd.extend(["-codec:a", "libmp3lame", "-b:a", "64k"])
-            cmd.append(audio_path)
-            
-            result = subprocess.run(cmd, capture_output=True, text=True)
-            if result.returncode != 0:
-                print(f"[VideoProcessor] Ffmpeg extraction error: {result.stderr}")
-                return None
+        is_audio = ext in [".mp3", ".wav", ".flac", ".ogg", ".m4a"]
 
-        print(f"[VideoProcessor] Audio ajratildi (Tezkor STT rejim): {audio_path}")
+        if is_audio:
+            with AudioFileClip(video_path) as clip:
+                clip.write_audiofile(
+                    audio_path,
+                    fps=sample_rate,
+                    nbytes=2,
+                    codec="libmp3lame" if format == "mp3" else "pcm_s16le",
+                    logger=None
+                )
+        else:
+            with VideoFileClip(video_path) as clip:
+                if clip.audio is None:
+                    print("[VideoProcessor] ERROR: Videoda audio trek yo'q!")
+                    return None
+                    
+                clip.audio.write_audiofile(
+                    audio_path,
+                    fps=sample_rate,
+                    nbytes=2,
+                    codec="libmp3lame" if format == "mp3" else "pcm_s16le",
+                    logger=None
+                )
+
+        print(f"[VideoProcessor] Audio ajratildi (MoviePy): {audio_path}")
         return audio_path
 
     except ImportError:
