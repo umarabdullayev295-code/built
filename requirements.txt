@@ -1,0 +1,6 @@
+streamlit
+moviepy
+faster-whisper
+httpx
+python-dotenv
+python-srt
