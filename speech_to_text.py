@@ -123,8 +123,8 @@ class SpeechToText:
 
             # 2. Whisper (Tezkor lekin aniq) orqali vaqtlarni aniqlash
             orig_size = self.whisper_model_size
-            # 'small' o'zbek tili uchun 'base' dan ancha aniqroq
-            self.whisper_model_size = "small" 
+            # Cloud uchun 'tiny' (kam xotira), lokal uchun 'small' ishlatiladi
+            self.whisper_model_size = "tiny" 
             whisper_results = self._transcribe_whisper(audio_path)
             self.whisper_model_size = orig_size # Asliga qaytaramiz
 
