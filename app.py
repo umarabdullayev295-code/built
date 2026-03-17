@@ -443,18 +443,18 @@ with col_theme:
     st.write("")
     st.write("")
     
-    # 3 nuqta menyusi (popover)
-    with st.popover("⋮"):
-        st.markdown("**Mavzuni O'zgartirish**")
-        c1, c2 = st.columns(2)
-        with c1:
-            if st.button("☀️ Light", use_container_width=True, key="theme_l"):
-                st.session_state.theme = "light"
-                st.rerun()
-        with c2:
-            if st.button("🌙 Dark", use_container_width=True, key="theme_d"):
-                st.session_state.theme = "dark"
-                st.rerun()
+    # Kichkina Deploy va Mavzu tugmalari
+    c1, c2, c3 = st.columns([0.4, 0.3, 0.3])
+    with c1:
+        st.link_button("🚀 Deploy", "https://github.com/umarabdullayev295-code/built", help="GitHub sahifasiga o'tish")
+    with c2:
+        if st.button("☀️", key="theme_l", help="Light Mode"):
+            st.session_state.theme = "light"
+            st.rerun()
+    with c3:
+        if st.button("🌙", key="theme_d", help="Dark Mode"):
+            st.session_state.theme = "dark"
+            st.rerun()
 
 # ─────────────────────────────────────────────
 # SIDEBAR — Sozlamalar va Video yuklash
