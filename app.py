@@ -469,13 +469,11 @@ with st.sidebar:
         else:
             st.session_state.whisper_model = st.selectbox(
                 "Whisper model hajmi:",
-                ["tiny", "base", "small", "medium", "large-v2", "large-v3"],
-                index=["tiny", "base", "small", "medium", "large-v2", "large-v3"].index(
-                    st.session_state.whisper_model
-                ),
-                help="Kattaroq model = aniqroq natija, lekin sekinroq",
+                ["tiny", "base", "small", "medium", "large"],
+                index=0, # Default to tiny for Streamlit Cloud Memory Limits
+                help="Kattaroq model = aniqroq natija, lekin sekinroq va ko'p xotira (RAM) talab qiladi",
             )
-            st.info("💡 O'zbek tili uchun `medium` yoki `large-v2` tavsiya etiladi.")
+            st.info("💡 Cloud xosting uchun `tiny` yoki `base` tavsiya etiladi (xotira cheklangan).")
 
 
     st.markdown("---")
