@@ -429,12 +429,23 @@ div[data-testid="stRadio"] label {{
 # ─────────────────────────────────────────────
 # HEADER
 # ─────────────────────────────────────────────
-st.markdown("""
-<div class="main-header">
-    <h1>🎬 Video AI Search</h1>
-    <p>Videodan Matn va audio orqali aqlli qidiruv tizimi</p>
-</div>
-""", unsafe_allow_html=True)
+col_title, col_theme = st.columns([8, 2])
+with col_title:
+    st.markdown("""
+    <div class="main-header">
+        <h1>🎬 Video AI Search</h1>
+        <p>Videodan Matn va audio orqali aqlli qidiruv tizimi</p>
+    </div>
+    """, unsafe_allow_html=True)
+
+with col_theme:
+    st.write("") # Bo'sh joy qo'shish (hizslash uchun)
+    st.write("")
+    st.write("")
+    current_icon = "☀️ Light" if st.session_state.theme == "dark" else "🌙 Dark"
+    if st.button(current_icon, use_container_width=True, key="theme_btn_top"):
+        st.session_state.theme = "light" if st.session_state.theme == "dark" else "dark"
+        st.rerun()
 
 # ─────────────────────────────────────────────
 # SIDEBAR — Sozlamalar va Video yuklash
@@ -546,16 +557,6 @@ with st.sidebar:
                 st.write(f"Davomiylik: {m}:{s:02d}")
 
     st.markdown("---")
-    col_l, col_d = st.columns(2)
-    with col_l:
-        if st.button("☀️ Light", use_container_width=True, key="light_btn"):
-            st.session_state.theme = "light"
-            st.rerun()
-    with col_d:
-        if st.button("🌙 Dark", use_container_width=True, key="dark_btn"):
-            st.session_state.theme = "dark"
-            st.rerun()
-
     st.markdown("""
     <div style="text-align:center; padding-top: 0.5rem;">
         <div style="color:#8b949e; font-size:0.75rem; font-weight: 500;">
