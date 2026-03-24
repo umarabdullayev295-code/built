@@ -11,7 +11,8 @@ import time
 import random
 from typing import List, Dict, Optional
 try:
-    from elevenlabs.client import ElevenLabs
+    # from elevenlabs.client import ElevenLabs
+    pass
 except ImportError:
     ElevenLabs = None
 import httpx
@@ -26,160 +27,8 @@ except ImportError:
 MUXLISA_API_URL = "https://service.muxlisa.uz/api/v2/stt"
 
 
-class ElevenLabsClient:
-    """
-    ElevenLabs Scribe v2 — eng aniq ko'p tilli STT modeli.
-    O'zbek tilini (uzb) mukammal taniydi, gap yoki so'z belgilari bilan.
-    Sayt: https://elevenlabs.io/speech-to-text
-    """
+# ElevenLabsClient removed to simplify the application.
 
-    def __init__(self, api_key: str = None):
-        self.api_key = api_key or os.environ.get("ELEVENLABS_API_KEY")
-        self.available = bool(self.api_key)
-
-    def _simulate_human_usage(self):
-        """Simulates human-like behavior with natural pauses between requests."""
-        # Rule: Avoid rapid consecutive requests (2.0s to 5.0s delay)
-        pause = random.uniform(2.0, 5.0)
-        time.sleep(pause)
-
-    def is_available(self) -> bool:
-        return self.available
-
-    def transcribe_audio(self, audio_path: str, language: str = "uz") -> List[Dict]:
-        """
-        ElevenLabs Scribe v1 orqali audio faylni matnga o'tkazadi.
-
-        Args:
-            audio_path: Audio fayl yo'li
-            language: Til kodi (standart: 'uz' — o'zbek)
-
-        Returns:
-            Segmentlar ro'yxati: [{"start": float, "end": float, "text": str}]
-        """
-        if not self.available:
-            return []
-
-        # Rule: Simulate human usage pattern to avoid abuse detection
-        self._simulate_human_usage()
-
-        headers = {"xi-api-key": self.api_key}
-        lang_map = {"uz": "uzb", "ru": "rus", "en": "eng", "tr": "tur"}
-        iso3_lang = lang_map.get(language, "uzb")
-
-        try:
-            client = ElevenLabs(api_key=self.api_key)
-            with open(audio_path, "rb") as audio_file:
-                response = client.speech_to_text.convert(
-                    file=audio_file,
-                    model_id="scribe_v2",
-                    language_code=iso3_lang,
-                    tag_audio_events=False,
-                    diarize=False
-                )
-                result = response.model_dump() if hasattr(response, 'model_dump') else response
-                return self._parse_response(result)
-
-        except Exception as e:
-            err_msg = str(e)
-            if "detected_unusual_activity" in err_msg:
-                print("[AI Engine] XAVFSIZLIK CHEKLOVI: ElevenLabs tomonidan shubhali faollik aniqlandi.")
-                print("[AI Engine] MASLAHAT: Bir oz kutib qayta urinib ko'ring yoki 'Muxlisa AI' yoki 'Whisper' modeliga o'ting.")
-            else:
-                print(f"[AI Engine] Process Alert: {err_msg}")
-            return []
-
-    def generate_speech(self, text: str, voice_id: str = "JBFqnCBsd6RMkjVDRZzb") -> Optional[str]:
-        """
-        Generates natural, human-like speech from text.
-        Optimized for clarity and professional pacing.
-        """
-        if not self.available or not text.strip():
-            return None
-
-        # Rule: Avoid rapid requests
-        self._simulate_human_usage()
-
-        try:
-            client = ElevenLabs(api_key=self.api_key)
-            audio_generator = client.generate(
-                text=text,
-                voice=voice_id,
-                model="eleven_multilingual_v2"
-            )
-            
-            # Temporary file storage
-            tmp_f = tempfile.NamedTemporaryFile(delete=False, suffix=".mp3")
-            for chunk in audio_generator:
-                if chunk:
-                    tmp_f.write(chunk)
-            tmp_f.close()
-            return tmp_f.name
-
-        except Exception as e:
-            print(f"[AI Engine] TTS Generation Alert: {e}")
-            return None
-
-    def _parse_response(self, result: dict) -> List[Dict]:
-        """
-        ElevenLabs API javobini standart segment formatiga o'tkazadi.
-        So'z darajasidagi vaqtlardan gap segmentlari yaratadi.
-        """
-        segments = []
-
-        # 1. Scribe V2 format — segments -> words
-        if "segments" in result:
-            for seg in result["segments"]:
-                for w in seg.get("words", []):
-                    word_text = w.get("text", "").strip()
-                    if word_text:
-                        segments.append({
-                            "start": float(w.get("start", 0)),
-                            "end": float(w.get("end", 0)),
-                            "text": word_text
-                        })
-        
-        # 2. Direct words format (Legacy or other models)
-        elif "words" in result:
-            segments = self._words_to_segments(result["words"])
-            
-        # 3. Fallback to full text if no words/segments
-        elif "text" in result:
-            raw_text = str(result.get("text", "")).strip()
-            segments = [{
-                "start": 0.0,
-                "end": 0.0,
-                "text": raw_text,
-            }]
-
-        return [s for s in segments if str(s.get("text", "")).strip()]
-
-    def _words_to_segments(self, words: list) -> List[Dict]:
-        """
-        So'zlarni to'g'ridan-to'g'ri alohida segmentlar sifatida qaytaradi.
-        Bu bilan subtitrda har bir so'z aniq o'z vaqtida yonadi.
-        """
-        if not words:
-            return []
-
-        segments = []
-        for w in words:
-            # Ba'zi modellarda "type" = "word" yoki shunchaki text mavjud
-            if w.get("type", "word") != "word":
-                continue
-            
-            word_text = str(w.get("text", w.get("word", ""))).strip()
-            if not word_text:
-                continue
-
-            # Har bir so'zni o'zining aniq boshlanish va tugash vaqtida alohida frame qilamiz
-            segments.append({
-                "start": float(w.get("start", 0)),
-                "end": float(w.get("end", 0)),
-                "text": word_text
-            })
-
-        return segments
 
 class MuxlisaClient:
     """
@@ -237,24 +86,13 @@ class MuxlisaClient:
         return bool(self.api_key)
 
 
-def get_best_api_client(engine_name: str = "ElevenLabs"):
+def get_best_api_client(engine_name: str = "Muxlisa AI (Pro)"):
     """
     Mavjud eng yaxshi API mijozini qaytaradi.
+    Faqat Muxlisa AI qo'llab-quvvatlanadi.
     """
-    if "Muxlisa" in engine_name:
-        muxlisa = MuxlisaClient()
-        if muxlisa.is_available():
-            return muxlisa, "Muxlisa AI (Pro)"
-            
-    if "Noiz AI" in engine_name:
-        # Noiz AI STT hozircha ElevenLabs fallback sifatida
-        elevenlabs = ElevenLabsClient()
-        if elevenlabs.is_available():
-            return elevenlabs, "Noiz AI (Professional)"
-
-    elevenlabs = ElevenLabsClient()
-    if elevenlabs.is_available():
-        name = "My AI (Premium)" if "My AI" in engine_name else "O'zbek AI Model (Pro)"
-        return elevenlabs, name
+    muxlisa = MuxlisaClient()
+    if muxlisa.is_available():
+        return muxlisa, "Muxlisa AI (Pro)"
 
     return None, None

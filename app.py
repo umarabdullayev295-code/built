@@ -41,8 +41,6 @@ def init_state():
         "last_results": [],
         "engine_name": "",
         "video_duration": 0,
-        "elevenlabs_key": os.environ.get("ELEVENLABS_API_KEY", ""),
-        "whisper_model": "base",
         "target_lang": "uz",
         "theme": "dark",
         "tts_engine": "Muxlisa",
@@ -420,27 +418,23 @@ with st.sidebar:
 
     # --- AI Engine sozlamalari ---
     with st.expander("🤖 AI Dvigatel", expanded=True):
-        default_engine_idx = 0 if st.session_state.target_lang == "uz" else 1
-        
         engine_choice = st.selectbox(
             "Transkripsiya modeli:",
             ["Muxlisa AI (Pro)", "Whisper (Asosiy)"],
             index=0 if st.session_state.target_lang == "uz" else 1,
-            help="O'zbek tili uchun 'Muxlisa AI' tavsiya etiladi. Boshqa tillar uchun 'Asosiy' model ishonchliroq.",
+            help="O'zbek tili uchun 'Muxlisa AI' tavsiya etiladi.",
         )
 
         if engine_choice == "Muxlisa AI (Pro)":
-            st.success("🛰️ Muxlisa AI (National) faol. O'zbek tili bo'yicha mutaxassis model.")
+            st.success("🛰️ Muxlisa AI (National) faol.")
         else:
-            st.session_state.whisper_model = st.selectbox(
+            st.session_state["whisper_model"] = st.selectbox(
                 "Whisper model hajmi:",
                 ["tiny", "base", "small", "medium", "large-v2", "large-v3"],
-                index=["tiny", "base", "small", "medium", "large-v2", "large-v3"].index(
-                    st.session_state.whisper_model
-                ),
-                help="Kattaroq model = aniqroq natija, lekin sekinroq",
+                index=1,
             )
             st.info("💡 O'zbek tili uchun `medium` yoki `large-v2` tavsiya etiladi.")
+
 
 
     st.markdown("---")
@@ -592,10 +586,9 @@ if st.session_state.processing and st.session_state.video_path:
 
         from speech_to_text import SpeechToText
         stt = SpeechToText(
-            whisper_model_size=st.session_state.whisper_model,
+            whisper_model_size=st.session_state.get("whisper_model", "base"),
             language=st.session_state.target_lang,
             use_api=(engine_choice in ["Muxlisa AI (Pro)"]),
-            elevenlabs_api_key=None,
             engine_name=engine_choice
         )
         st.session_state.stt_engine = stt
@@ -742,9 +735,8 @@ else:
                         if stt is None:
                             from speech_to_text import SpeechToText
                             stt = SpeechToText(
-                                whisper_model_size=st.session_state.whisper_model,
+                                whisper_model_size=st.session_state.get("whisper_model", "base"),
                                 language="uz",
-                                elevenlabs_api_key=st.session_state.elevenlabs_key or None,
                             )
                             st.session_state.stt_engine = stt
 

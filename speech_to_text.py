@@ -33,8 +33,7 @@ class SpeechToText:
         whisper_model_size: str = "medium",
         language: str = "uz",
         use_api: bool = True,
-        elevenlabs_api_key: Optional[str] = None,
-        engine_name: str = "O'zbek AI Model (Pro)"
+        engine_name: str = "Muxlisa AI (Pro)"
     ):
         """
         Args:
@@ -52,7 +51,7 @@ class SpeechToText:
 
         if use_api:
             self._api_client, self.active_engine = self._pick_api_client(
-                elevenlabs_api_key, engine_name
+                engine_name
             )
 
         if not self.active_engine:
@@ -61,7 +60,6 @@ class SpeechToText:
     # ------------------------------------------------------------------ #
     def _pick_api_client(
         self,
-        el_key: Optional[str],
         engine_name: str = "Muxlisa AI (Pro)"
     ):
         """
