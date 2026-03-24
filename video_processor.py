@@ -11,7 +11,10 @@ import sys
 import tempfile
 import time
 import shutil
-from typing import Optional, List, DictTuple
+import uuid
+import gc
+import subprocess
+from typing import Optional, List, Dict, Tuple
 
 
 def extract_audio(
