@@ -41,6 +41,7 @@ def init_state():
         "last_results": [],
         "engine_name": "",
         "video_duration": 0,
+        "whisper_model": "base",
         "target_lang": "uz",
         "theme": "dark",
         "tts_engine": "Muxlisa",
@@ -572,7 +573,7 @@ if st.session_state.processing and st.session_state.video_path:
         status_text.markdown("**2/4** 🔊 Audio ajratilmoqda (Tezkor rejim)...")
         progress_bar.progress(25)
         from video_processor import extract_audio
-        audio_path = extract_audio(video_path, format="wav", sample_rate=16000)
+        audio_path = extract_audio(video_path, output_ext="wav")
 
         if not audio_path:
             st.error("❌ Audio ajratib bo'lmadi. Video fayldа audio trek mavjudligini tekshiring.")
