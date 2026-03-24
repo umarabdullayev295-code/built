@@ -64,26 +64,13 @@ def extract_audio(
             if format == "mp3":
                 cmd.extend(["-codec:a", "libmp3lame", "-b:a", "64k"])
             cmd.append(audio_path)
-            result = subprocess.run(cmd, capture_output=True, text=True)
-            if result.returncode != 0:
-                print(f"[VideoProcessor] Ffmpeg convert error: {result.stderr}")
-                return None
-        else:
-            # Video fayldan audio ajratish
-            cmd = [
-                "ffmpeg", "-y", "-i", video_path,
-                "-vn", "-ac", "1", "-ar", str(sample_rate)
-            ]
-            if format == "mp3":
-                cmd.extend(["-codec:a", "libmp3lame", "-b:a", "64k"])
-            cmd.append(audio_path)
-            
-            result = subprocess.run(cmd, capture_output=True, text=True)
-            if result.returncode != 0:
-                print(f"[VideoProcessor] Ffmpeg extraction error: {result.stderr}")
-                return None
+        import sys
+        result = subprocess.run(cmd, capture_output=True, text=True)
+        if result.returncode != 0:
+            print(f"[VideoProcessor] Ffmpeg Error (Code {result.returncode}):\n{result.stderr}", file=sys.stderr)
+            return None
 
-        print(f"[VideoProcessor] Audio ajratildi (Tezkor STT rejim): {audio_path}")
+        print(f"[VideoProcessor] Audio successfully extracted: {audio_path}")
         gc.collect()
         return audio_path
 
