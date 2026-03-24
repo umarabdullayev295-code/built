@@ -7,10 +7,11 @@ WAV formatida saqlash tavsiya etiladi (yuqori sifat).
 """
 
 import os
-import uuid
+import sys
 import tempfile
-import gc
-from typing import Optional, Tuple
+import time
+import shutil
+from typing import Optional, List, DictTuple
 
 
 def extract_audio(
@@ -54,27 +55,6 @@ def extract_audio(
             return None
 
         # Video yoki faqat audio fayl ekanligini aniqlash
-        ext = os.path.splitext(video_path)[1].lower()
-        if ext in [".mp3", ".wav", ".flac", ".ogg", ".m4a"]:
-            # To'g'ridan-to'g'ri audio fayl bo'lsa, ffmpeg orqali konvertatsiya
-            cmd = [
-                "ffmpeg", "-y", "-i", video_path,
-                "-ac", "1", "-ar", str(sample_rate)
-            ]
-            if format == "mp3":
-                cmd.extend(["-codec:a", "libmp3lame", "-b:a", "64k"])
-            cmd.append(audio_path)
-        import sys
-        result = subprocess.run(cmd, capture_output=True, text=True)
-        if result.returncode != 0:
-            print(f"[VideoProcessor] Ffmpeg Error (Code {result.returncode}):\n{result.stderr}", file=sys.stderr)
-            return None
-
-        print(f"[VideoProcessor] Audio successfully extracted: {audio_path}")
-        gc.collect()
-        return audio_path
-
-    except ImportError:
         print("[VideoProcessor] moviepy o'rnatilmagan. Quyidagi buyruqni bajaring:")
         print("  pip install moviepy")
         return None
