@@ -250,24 +250,25 @@ def render_youtube_player(
     text-shadow: 1px 1px 6px rgba(0,0,0,0.9);
     cursor: pointer;
     transition:
-      color       0.12s ease-out,
-      transform   0.14s cubic-bezier(0.175, 0.885, 0.32, 1.4),
-      text-shadow 0.12s ease-out;
+      color       0.08s ease-out,
+      transform   0.1s cubic-bezier(0.2, 0, 0.2, 1),
+      text-shadow 0.08s ease-out;
   }}
 
-  /* Active word: TikTok gold pop */
+  /* YouTube-style yellow highlight */
   .word.active {{
-    color: #FFD700;
-    transform: scale(1.18) translateY(-2px);
-    text-shadow:
-      0 0 18px rgba(255,215,0,0.65),
-      0 0  8px rgba(255,215,0,0.4),
-      2px 2px 6px rgba(0,0,0,1);
+    display: inline-block;
+    color: #ffcc00; 
+    transform: scale(1.1);
+    text-shadow: 
+      0 0 12px rgba(255, 204, 0, 0.5),
+      2px 2px 4px rgba(0,0,0,0.9);
+    z-index: 10;
   }}
 
-  /* Passed words (Progressive + Karaoke) */
   .word.passed {{
-    color: rgba(255,255,255,0.9);
+    color: #ffffff;
+    opacity: 1;
   }}
 
   /* ── Mode switcher (top-right, appears on hover) ── */
@@ -312,9 +313,9 @@ def render_youtube_player(
 
   <!-- Mode switcher -->
   <div class="mode-bar">
-    <button class="m-btn on" data-mode="1">1-Word</button>
+    <button class="m-btn"    data-mode="1">1-Word</button>
     <button class="m-btn"    data-mode="2">Progressive</button>
-    <button class="m-btn"    data-mode="3">Karaoke</button>
+    <button class="m-btn on" data-mode="3">Karaoke</button>
   </div>
 
   <!-- Subtitle overlay -->
@@ -337,22 +338,23 @@ def render_youtube_player(
 const vid   = document.getElementById('vid');
 const cbox  = document.getElementById('cbox');
 const words = Array.from(document.querySelectorAll('.word'));
-let mode    = 1;   // 1 = 1-Word  |  2 = Progressive  |  3 = Karaoke
+let mode    = 3;   // 1 = 1-Word  |  2 = Progressive  |  3 = Karaoke (YouTube style)
 
 /* ── Pre-compute phrase groups (burst gap > 0.9s → new phrase) ── */
 const phrases = [];
 let cur = [];
 let maxTimestamp = 0;
-// Add a negative offset so words visually pop slightly BEFORE the sound, eliminating any perceived lag!
-const PERCEPTION_OFFSET = 0.15;
+// Add a small negative offset for perception 
+const PERCEPTION_OFFSET = 0.08;
 
 words.forEach((w, idx) => {{
-  const st = parseFloat(w.dataset.start) - PERCEPTION_OFFSET;
-  const end = parseFloat(w.dataset.end) - (PERCEPTION_OFFSET / 2);
-  if (parseFloat(w.dataset.end) > maxTimestamp) maxTimestamp = parseFloat(w.dataset.end);
+  const st = parseFloat(w.dataset.start);
+  const end = parseFloat(w.dataset.end);
+  if (end > maxTimestamp) maxTimestamp = end;
 
-  const prevEnd = cur.length ? (parseFloat(cur[cur.length-1].dataset.end) - (PERCEPTION_OFFSET / 2)) : 0;
-  if (idx > 0 && (st - prevEnd > 0.9 || cur.length >= 8)) {{
+  const prevEnd = cur.length ? parseFloat(cur[cur.length-1].dataset.end) : 0;
+  // Increase block size to 12 words, similar to a standard YouTube subtitle line
+  if (idx > 0 && (st - prevEnd > 1.2 || cur.length >= 12)) {{
     phrases.push(cur);
     cur = [w];
   }} else {{
@@ -381,8 +383,8 @@ function hideAll() {{
 
 function findActivePhrase(ct) {{
   for (const ph of phrases) {{
-    const ps = parseFloat(ph[0].dataset.start) - 0.15;
-    const pe = parseFloat(ph[ph.length-1].dataset.end)  + 0.35;
+    const ps = parseFloat(ph[0].dataset.start) - 0.2;
+    const pe = parseFloat(ph[ph.length-1].dataset.end) + 0.1;
     if (ct >= ps && ct <= pe) return ph;
   }}
   return null;
