@@ -147,8 +147,13 @@ class SpeechToText:
 
             # 3. Muxlisa so'zlarini Whisper vaqtlariga Sequence Matching orqali bog'lash
             import difflib
-            whisper_words = [w["text"].lower().strip() for w in whisper_results]
-            mux_words_low = [w.lower().strip() for w in muxlisa_words]
+            import re
+            
+            def clean_word(word):
+                return re.sub(r'[^\w\s]', '', word.lower().strip())
+                
+            whisper_words = [clean_word(w["text"]) for w in whisper_results]
+            mux_words_low = [clean_word(w) for w in muxlisa_words]
             
             matcher = difflib.SequenceMatcher(None, mux_words_low, whisper_words)
             aligned = []

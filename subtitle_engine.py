@@ -19,6 +19,9 @@ def render_youtube_player(video_path: str, segments: List[Dict], start_time: flo
     YouTube uslubidagi word-by-word subtitrli video player.
     Subtitrlar video tagida, real-vaqtda yonib turadi.
     """
+    if start_time > 0:
+        start_time = max(0.0, start_time - 0.3)
+
     if not video_path or not os.path.exists(video_path):
         st.error("Media fayl topilmadi.")
         return
