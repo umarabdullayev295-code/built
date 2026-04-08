@@ -121,84 +121,84 @@ class SpeechToText:
         Muxlisa AI matnini Whisper vaqtlariga 100% aniqlik bilan bog'laydi.
         """
         try:
-            # 1. Muxlisa matnini olish, bir necha qism yig'ilganda ularni bitta qilib birlashtiramiz
+            # 1. Muxlisa matnini olish
             full_text = " ".join(r.get("text", "") for r in results if r.get("type") == "muxlisa_raw")
             muxlisa_words = [w.strip() for w in full_text.split() if w.strip()]
             if not muxlisa_words:
                 return results
 
             # 2. Whisper orqali vaqtlarni aniqlash
-            # "base" model ba'zida 1 daqiqalik videoni 8 soniyada "tugadi" deb gallyutsinatsiya qilib yuboradi.
-            # Shu sababli foydalanuvchi qaysi modelni tanlagan bo'lsa, xuddi o'sha model ishlatiladi!
             whisper_results = self._transcribe_whisper(audio_path)
 
-            # 3. Muxlisa chunklari (esingizda bo'lsa API har 50s da bo'ladi) orqali yopishtiramiz
+            # 3. Muxlisa chunklari orqali yopishtiramiz
             aligned = []
-            
+            import difflib
+
             for m_chunk in results:
                 if m_chunk.get("type") != "muxlisa_raw":
                     continue
                     
                 text = m_chunk.get("text", "")
-                words = [w.strip() for w in text.split() if w.strip()]
-                if not words:
+                m_words = [w.strip() for w in text.split() if w.strip()]
+                if not m_words:
                     continue
                     
-                # Muxlisa aniqlagan joriy blok yuki (masalan: 0s dan 50s gacha)
                 c_start = m_chunk["start"]
                 c_end = m_chunk["end"]
                 
                 # Shu oraliqdagi Whisper so'zlarini ajratib olamiz
-                w_sub = [w for w in whisper_results if w["start"] >= c_start - 1.0 and w["start"] <= c_end + 1.0]
+                w_sub = [w for w in whisper_results if w["start"] >= c_start - 2.0 and w["start"] <= c_end + 2.0]
                 
-                m_count = len(words)
-                w_count = len(w_sub)
-                
-                # Agar Whisper gallyutsinatsiya qilib hech narsa topmagan yoki erta to'xtab qolgan bo'lsa
-                if w_count == 0:
-                    # Xavfsizlik qatlami: oddiy vaqtga teng taqsimlash
-                    # Hamma so'zni birdaniga 8 sekuntga otib yubormasligi uchun!
-                    step = (c_end - c_start) / m_count if m_count > 0 else 0.4
-                    for i, w in enumerate(words):
+                if not w_sub:
+                    step = (c_end - c_start) / len(m_words)
+                    for i, w in enumerate(m_words):
                         aligned.append({"start": round(c_start + i*step, 3), "end": round(c_start + (i+1)*step, 3), "text": w})
                 else:
-                    # Index proporsiyasi bilan Whisper VAD (jimjitlikka moslashib) ishlatamiz!
+                    w_words = [w["text"].strip().lower() for w in w_sub]
+                    m_words_lower = [w.lower() for w in m_words]
                     
-                    # Agar Whisper faqat kichkina qismni (masalan 8 sekuntni) topgan-u, Muxlisa bloki 50sek bo'lsa:
-                    # Biz uni vaqt bo'yicha to'g'irlaymiz
-                    max_w_end = max(w["end"] for w in w_sub)
-                    # 10 soniyadan ortiq muddat yo'qolgan bo'lsa -> Whisper adashgan
-                    if (c_end - max_w_end) > 10.0 and m_count > w_count * 2:
-                         step = (c_end - c_start) / m_count
-                         for i, w in enumerate(words):
-                             aligned.append({"start": round(c_start + i*step, 3), "end": round(c_start + (i+1)*step, 3), "text": w})
-                         continue
-
-                    grouped = {}
-                    for i, w in enumerate(words):
-                        w_idx = int((i / m_count) * w_count)
-                        w_idx = min(w_idx, w_count - 1)
-                        if w_idx not in grouped:
-                            grouped[w_idx] = []
-                        grouped[w_idx].append(w)
-                        
-                    for w_idx in sorted(grouped.keys()):
-                        words_list = grouped[w_idx]
-                        w_start = w_sub[w_idx]["start"]
-                        w_end = w_sub[w_idx]["end"]
-                        
-                        c = len(words_list)
-                        step = (w_end - w_start) / c if c > 0 else 0
-                        
-                        for idx, word in enumerate(words_list):
-                            t_start = w_start + idx * step
-                            t_end = w_start + (idx + 1) * step
-                            aligned.append({
-                                "start": round(t_start, 3),
-                                "end": round(t_end, 3),
-                                "text": word
-                            })
+                    matcher = difflib.SequenceMatcher(None, w_words, m_words_lower)
+                    m_times = [{"start": None, "end": None} for _ in range(len(m_words))]
                     
+                    for w_idx, m_idx, length in matcher.get_matching_blocks():
+                        for i in range(length):
+                            m_times[m_idx + i]["start"] = w_sub[w_idx + i]["start"]
+                            m_times[m_idx + i]["end"] = w_sub[w_idx + i]["end"]
+                    
+                    for i in range(len(m_words)):
+                        if m_times[i]["start"] is None:
+                            prev_t = c_start
+                            for j in range(i - 1, -1, -1):
+                                if m_times[j]["end"] is not None:
+                                    prev_t = m_times[j]["end"]
+                                    break
+                            next_t = c_end
+                            for j in range(i + 1, len(m_words)):
+                                if m_times[j]["start"] is not None:
+                                    next_t = m_times[j]["start"]
+                                    break
+                            
+                            gap_start = i
+                            gap_end = i
+                            for j in range(i + 1, len(m_words)):
+                                if m_times[j]["start"] is None:
+                                    gap_end = j
+                                else:
+                                    break
+                            
+                            gap_size = gap_end - gap_start + 1
+                            step = (next_t - prev_t) / (gap_size + 1)
+                            for k in range(gap_size):
+                                idx = gap_start + k
+                                m_times[idx]["start"] = prev_t + (k + 0.1) * step
+                                m_times[idx]["end"] = prev_t + (k + 0.9) * step
+                                
+                    for i, w in enumerate(m_words):
+                        aligned.append({
+                            "start": round(m_times[i]["start"], 3),
+                            "end": round(m_times[i]["end"], 3),
+                            "text": w
+                        })
             return aligned
         except Exception as e:
             print(f"[STT] Alignment hatosi: {e}")

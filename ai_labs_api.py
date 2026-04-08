@@ -98,7 +98,7 @@ class MuxlisaClient:
                                 if chunk_text:
                                     result_text = chunk_text
                             else:
-                                print(f"[Muxlisa AI] Chunk {chunk_idx} error: {response.text}")
+                                print(f"[Muxlisa AI] Chunk {chunk_idx} error: Status {response.status_code}, Body: {response.text}")
                 finally:
                     if os.path.exists(tmp_wav_path):
                         os.remove(tmp_wav_path)
