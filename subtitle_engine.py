@@ -108,20 +108,29 @@ def render_youtube_player(video_path: str, segments: List[Dict], start_time: flo
 
         .word {{
             display: none;
-            font-size: 2.5rem;
-            color: rgba(255, 255, 255, 0.9);
+            font-size: 2.8rem;
+            color: #ffffff;
             margin: 0 8px;
-            font-weight: 800;
+            font-weight: 900;
             cursor: pointer;
             pointer-events: auto;
-            text-shadow: 2px 2px 0 #000, -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000, 1px 1px 0 #000;
             text-transform: uppercase;
+            text-shadow: 
+                -2px -2px 0 #000,
+                 2px -2px 0 #000,
+                -2px  2px 0 #000,
+                 2px  2px 0 #000,
+                 4px  4px 10px rgba(0,0,0,0.8);
+            transform: scale(0.9) translateY(10px);
+            opacity: 0;
+            transition: transform 0.15s cubic-bezier(0.175, 0.885, 0.32, 1.275), 
+                        opacity 0.1s ease-out;
         }}
 
         .word.active {{
-            color: #ffd700;
-            transform: scale(1.1);
-            text-shadow: 0 0 20px rgba(255,215,0,0.8), 2px 2px 4px rgba(0,0,0,1);
+            color: #ffeb3b; 
+            transform: scale(1.15) translateY(0px);
+            opacity: 1;
             z-index: 10;
         }}
 

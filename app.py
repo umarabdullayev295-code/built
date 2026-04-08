@@ -607,6 +607,8 @@ if st.session_state.processing and st.session_state.video_path:
         if not segments:
             st.warning("⚠️ Audio transkripsiya natijalari bo'sh. Boshqa model yoki fayl sinab ko'ring.")
             st.stop()
+        
+        st.toast("✅ Transkripsiya muvaffaqiyatli yakunlandi!", icon="🎯")
 
         # ── Qadam 4: Semantik indeks yaratish ──
         status_text.markdown(f"**4/4** 🔍 Semantik qidiruv indeksi yaratilmoqda ({len(segments)} segment)...")
@@ -620,6 +622,7 @@ if st.session_state.processing and st.session_state.video_path:
 
         progress_bar.progress(100)
         status_text.markdown(f"✅ **Tayyorlandi!** {count} segment indekslandi.")
+        st.toast(f"✅ {count} ta segment tahlil qilindi!", icon="🚀")
         
         # Tugatgandan so'ng xotirani tozalash
         gc.collect()
