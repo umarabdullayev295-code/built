@@ -593,7 +593,7 @@ if st.session_state.processing and st.session_state.video_path:
         stt = SpeechToText(
             whisper_model_size=st.session_state.get("whisper_model", "base"),
             language=st.session_state.target_lang,
-            use_api=(engine_choice in ["Muxlisa AI (Pro)"]),
+            use_api=("Muxlisa AI" in engine_choice),
             engine_name=engine_choice
         )
         st.session_state.stt_engine = stt
