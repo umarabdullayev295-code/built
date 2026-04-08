@@ -104,6 +104,7 @@ def render_youtube_player(
     start_time: float = 0.0,
     video_duration: float = 0.0,
     debug: bool = False,
+    latency_offset: float = 0.0
 ):
     """
     TikTok/YouTube Shorts uslubidagi professional subtitle player.
@@ -341,10 +342,10 @@ let mode    = 3;   // 1 = 1-Word  |  2 = Progressive  |  3 = Karaoke (YouTube st
 const phrases = [];
 let cur = [];
 let maxTimestamp = 0;
-// Resetting offset to 0 because user reported it's already ahead
+// Global sync adjustment
 const PERCEPTION_OFFSET = 0.0; 
-// Minor delay adjustment to prevent appearing too early
-const SYNC_DELAY = 0.05; 
+const MANUAL_LATENCY    = {latency_offset}; 
+const SYNC_DELAY        = 0.05 + MANUAL_LATENCY; 
 
 words.forEach((w, idx) => {{
   const st = parseFloat(w.dataset.start);
