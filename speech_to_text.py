@@ -145,66 +145,60 @@ class SpeechToText:
                 padding = 0.4
                 return [{"start": i*padding, "end": (i+1)*padding, "text": w} for i, w in enumerate(muxlisa_words)]
 
-            # 3. Muxlisa so'zlarini Whisper vaqtlariga Sequence Matching orqali bog'lash
-            import difflib
-            import re
-            
-            def clean_word(word):
-                return re.sub(r'[^\w\s]', '', word.lower().strip())
-                
-            whisper_words = [clean_word(w["text"]) for w in whisper_results]
-            mux_words_low = [clean_word(w) for w in muxlisa_words]
-            
-            matcher = difflib.SequenceMatcher(None, mux_words_low, whisper_words)
+            # 3. Protsentga asoslangan (Proportional) sinxronizatsiya
+            # Muxlisa matnini butun Whisper davomiyligi bo'ylab tekis va mantiqiy taqsimlaymiz
             aligned = []
             
-            # Har bir Muxlisa so'zi uchun vaqt topamiz
-            for tag, i1, i2, j1, j2 in matcher.get_opcodes():
-                if tag == 'equal':
-                    # To'g'ridan-to'g'ri mos keladigan so'zlar
-                    for idx, (m_idx, w_idx) in enumerate(zip(range(i1, i2), range(j1, j2))):
-                        aligned.append({
-                            "start": whisper_results[w_idx]["start"],
-                            "end": whisper_results[w_idx]["end"],
-                            "text": muxlisa_words[m_idx]
-                        })
-                elif tag in ('replace', 'insert'):
-                    m_slice: List[str] = muxlisa_words[i1:i2]
-                    count = len(m_slice)
-                    if count > 0:
-                        # Atrofdagi anchorlar (vaqtlar)ni topish
-                        w_res: List[Dict] = whisper_results
-                        p_idx = max(0, j1-1)
-                        n_idx = min(len(w_res)-1, j2)
-                        
-                        prev_time = float(aligned[-1]["end"]) if aligned else float(w_res[p_idx]["end"])
-                        next_time = float(w_res[n_idx]["start"])
-                        
-                        if next_time <= prev_time:
-                            next_time = prev_time + 0.5
-                        
-                        step = (next_time - prev_time) / count
-                        for idx, word in enumerate(m_slice):
-                            aligned.append({
-                                "start": round(prev_time + (idx * step), 2),
-                                "end": round(prev_time + ((idx + 1) * step), 2),
-                                "text": str(word)
-                            })
-                # 'delete' (Whisperda bor, Muxlisada yo'q) holatida biz hech narsa qo'shmaymiz,
-                # chunki bizga faqat Muxlisa so'zlari uchun vaqt kerak.
-
-            # Xavfsizlik: Agar biror sababga ko'ra ba'zi so'zlar qolib ketgan bo'lsa
-            if len(aligned) < len(muxlisa_words):
-                # Qolganlarini oxirgi vaqtdan so'ng qo'shamiz
-                last_end = aligned[-1]["end"] if aligned else 0.0
-                for i in range(len(aligned), len(muxlisa_words)):
-                    aligned.append({
-                        "start": last_end + (i - len(aligned)) * 0.4,
-                        "end": last_end + (i - len(aligned) + 1) * 0.4,
-                        "text": muxlisa_words[i]
-                    })
+            # Whisper segmentlaridan haqiqiy vaqt interval va bo'shliqlarni (VAD gaps) olamiz
+            # Bu orqali qachon jimjitlik bo'lsa o'sha joyga so'z tushib qolishi oldini olinadi!
+            whisper_intervals = []
+            for w in whisper_results:
+                whisper_intervals.append((w["start"], w["end"]))
+                
+            if not whisper_intervals:
+                # Agar Whisper umuman ishlamasa, avtomatik tekis taqsimot
+                padding = 0.4
+                return [{"start": i*padding, "end": (i+1)*padding, "text": w} for i, w in enumerate(muxlisa_words)]
+                
+            # Haqiqiy so'zlashuv davomiyligi (faqat gapirilayotgan soniyalar)
+            total_speech_duration = sum(end - start for start, end in whisper_intervals)
             
-            return aligned[:len(muxlisa_words)]
+            # Har bir Muxlisa so'ziga qanchadan vaqt tushadi
+            m_count = len(muxlisa_words)
+            time_per_word = total_speech_duration / m_count if m_count > 0 else 0.4
+            
+            current_interval_idx = 0
+            current_interval_used = 0.0
+            
+            for i, word in enumerate(muxlisa_words):
+                if current_interval_idx >= len(whisper_intervals):
+                    # Vaqt tugab qolsa ham so'zlarni oxiriga yopishtirib qolmaymiz
+                    last_end = whisper_intervals[-1][1] if whisper_intervals else 0
+                    start = last_end + (i - len(aligned)) * 0.4
+                    end = start + 0.4
+                    aligned.append({"start": round(start, 2), "end": round(end, 2), "text": word})
+                    continue
+                    
+                start_time = whisper_intervals[current_interval_idx][0] + current_interval_used
+                end_time = start_time + time_per_word
+                
+                # Agar bitta word intervaldan chiqib ketsa, uning qismini keyingi intervalga yopishtirmaymiz
+                # balki uni joriy interval oxiriga taqaymiz va intervalni o'zgartiramiz
+                if end_time > whisper_intervals[current_interval_idx][1]:
+                    # Juda uzun so'z bo'lsa yoki interval kalta bo'lsa, uni shu joyda tugatamiz
+                    end_time = whisper_intervals[current_interval_idx][1]
+                    current_interval_idx += 1
+                    current_interval_used = 0.0
+                else:
+                    current_interval_used += time_per_word
+                    
+                aligned.append({
+                    "start": round(start_time, 2),
+                    "end": round(end_time, 2),
+                    "text": word
+                })
+                
+            return aligned
         except Exception as e:
             print(f"[STT] Alignment hatosi: {e}")
             return results
