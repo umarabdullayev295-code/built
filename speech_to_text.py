@@ -99,10 +99,27 @@ class SpeechToText:
                 print(f"[STT] {self.active_engine} orqali tahlil qilinmoqda...")
                 results = client.transcribe_audio(audio_path, language=self.language)
                 
-                # Yangi: Muxlisa AI uchun Hybrid Alignment (100% aniq vaqt)
+                # Tez ishlashi uchun Whisper alignment bloklandi (Juda ko'p o'ylamasligi uchun)
                 if results and any(r.get("type") == "muxlisa_raw" for r in results):
-                    print("[STT] Muxlisa AI matni Whisper orqali 100% aniqlikda tekislanmoqda...")
-                    results = self._align_with_whisper(results, audio_path)
+                    print("[STT] Muxlisa AI tezkor rejimi... (Whisper alignment o'chirildi)")
+                    fast_results = []
+                    for r in results:
+                        if r.get("type") == "muxlisa_raw":
+                            text = r.get("text", "")
+                            start = float(r.get("start", 0.0))
+                            end = float(r.get("end", 60.0))
+                            words = text.split()
+                            if words:
+                                step = (end - start) / len(words)
+                                for i, w in enumerate(words):
+                                    fast_results.append({
+                                        "start": round(start + i * step, 2),
+                                        "end": round(start + (i + 1) * step, 2),
+                                        "text": w
+                                    })
+                        else:
+                            fast_results.append(r)
+                    results = fast_results
                 
                 if results:
                     return results

@@ -78,9 +78,10 @@ class MuxlisaClient:
                 for i in range(0, len(data), samples_per_chunk):
                     chunks.append((data[i:i+samples_per_chunk], i / samplerate))
                     
-            full_text = ""
-            
-            for chunk_data, start_sec in chunks:
+            import concurrent.futures
+
+            def process_chunk(chunk_idx, chunk_data, start_sec):
+                result_text = ""
                 with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as tmp_wav:
                     sf.write(tmp_wav.name, chunk_data, samplerate)
                     tmp_wav_path = tmp_wav.name
@@ -95,18 +96,37 @@ class MuxlisaClient:
                                 result_data = response.json()
                                 chunk_text = result_data.get("text", "").strip()
                                 if chunk_text:
-                                    full_text += chunk_text + " "
+                                    result_text = chunk_text
                             else:
-                                print(f"[Muxlisa AI] Chunk xato {response.status_code}: {response.text}")
+                                print(f"[Muxlisa AI] Chunk {chunk_idx} error: {response.text}")
                 finally:
                     if os.path.exists(tmp_wav_path):
                         os.remove(tmp_wav_path)
-            
-            full_text = full_text.strip()
-            if not full_text:
-                return []
                 
-            return [{"start": 0.0, "end": total_duration, "text": full_text, "type": "muxlisa_raw"}]
+                chunk_duration_sec = len(chunk_data) / samplerate
+                return chunk_idx, {
+                    "start": start_sec, 
+                    "end": start_sec + chunk_duration_sec, 
+                    "text": result_text, 
+                    "type": "muxlisa_raw"
+                }
+
+            results_dict = {}
+            with concurrent.futures.ThreadPoolExecutor(max_workers=5) as executor:
+                futures = []
+                for idx, (chunk_data, start_sec) in enumerate(chunks):
+                    futures.append(executor.submit(process_chunk, idx, chunk_data, start_sec))
+                    
+                for future in concurrent.futures.as_completed(futures):
+                    chunk_idx, chunk_result = future.result()
+                    if chunk_result["text"]:
+                        results_dict[chunk_idx] = chunk_result
+            
+            final_segments = []
+            for idx in sorted(results_dict.keys()):
+                final_segments.append(results_dict[idx])
+                
+            return final_segments
             
         except Exception as e:
             print(f"[Muxlisa AI] Umumiy xato: {e}")
