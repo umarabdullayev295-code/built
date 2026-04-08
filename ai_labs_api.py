@@ -148,6 +148,12 @@ class DeepgramClient:
     """
     def __init__(self, api_key: str = None):
         self.api_key = api_key or os.environ.get("DEEPGRAM_API_KEY")
+        if not self.api_key:
+            try:
+                import streamlit as st
+                self.api_key = st.secrets.get("DEEPGRAM_API_KEY")
+            except Exception:
+                pass
         self.available = bool(self.api_key)
 
     def is_available(self) -> bool:
