@@ -832,13 +832,25 @@ else:
                 if is_audio:
                     if st.session_state.segments:
                         from subtitle_engine import render_youtube_player
-                        render_youtube_player(st.session_state.video_path, st.session_state.segments, start_time=start_time)
+                        render_youtube_player(
+                            st.session_state.video_path, 
+                            st.session_state.segments, 
+                            start_time=start_time,
+                            video_duration=st.session_state.get('video_duration', 0.0),
+                            debug=True
+                        )
                     else:
                         st.audio(st.session_state.video_path, start_time=start_time)
                 else:
                     if st.session_state.segments:
                         from subtitle_engine import render_youtube_player
-                        render_youtube_player(st.session_state.video_path, st.session_state.segments, start_time=start_time)
+                        render_youtube_player(
+                            st.session_state.video_path, 
+                            st.session_state.segments, 
+                            start_time=start_time,
+                            video_duration=st.session_state.get('video_duration', 0.0),
+                            debug=True
+                        )
                     else:
                         st.video(st.session_state.video_path, start_time=start_time)
             except Exception as e:
