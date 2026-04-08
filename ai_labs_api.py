@@ -179,15 +179,25 @@ class DeepgramClient:
                     
                     if response.status_code == 200:
                         data = response.json()
-                        words_data = data.get("results", {}).get("channels", [{}])[0].get("alternatives", [{}])[0].get("words", [])
+                        results = data.get("results", {})
+                        channels = results.get("channels", [{}])
+                        alternatives = channels[0].get("alternatives", [{}])
+                        words_data = alternatives[0].get("words", [])
                         
+                        if not words_data:
+                            print("[Deepgram] No words found in response.")
+                            return []
+
                         segments = []
                         for winfo in words_data:
-                            segments.append({
-                                "start": round(winfo["start"], 3),
-                                "end": round(winfo["end"], 3),
-                                "text": winfo["punctuated_word"] or winfo["word"]
-                            })
+                            # punctuated_word bo'lsa uni olamiz, bo'lmasa oddiy word
+                            display_text = winfo.get("punctuated_word") or winfo.get("word", "")
+                            if display_text:
+                                segments.append({
+                                    "start": round(winfo.get("start", 0), 3),
+                                    "end": round(winfo.get("end", 0), 3),
+                                    "text": display_text
+                                })
                         return segments
                     else:
                         print(f"[Deepgram] Error {response.status_code}: {response.text}")
