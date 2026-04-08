@@ -241,44 +241,24 @@ def render_youtube_player(
   /* ── Individual word chip ── */
   .word {{
     display: none;
-    font-size: clamp(1.4rem, 4vw, 2.6rem);
-    font-weight: 800;
-    color: rgba(255,255,255,0.55);
-    letter-spacing: 0.03em;
-    text-shadow: 1px 1px 6px rgba(0,0,0,0.9);
-    cursor: pointer;
+    font-size: clamp(1.8rem, 6vw, 3.8rem); /* Make it bigger for single-word focus */
+    font-weight: 900;
+    color: #ffffff;
+    letter-spacing: -0.01em;
+    text-shadow: 2px 2px 10px rgba(0,0,0,1);
     transition:
-      color       0.08s ease-out,
-      transform   0.1s cubic-bezier(0.2, 0, 0.2, 1),
-      text-shadow 0.08s ease-out;
+      color       0.06s ease-out,
+      transform   0.08s cubic-bezier(0.2, 0, 0.2, 1);
   }}
 
-  /* YouTube-style yellow highlight */
   .word.active {{
     display: inline-block;
     color: #ffcc00; 
-    transform: scale(1.1);
-    text-shadow: 
-      0 0 12px rgba(255, 204, 0, 0.5),
-      2px 2px 4px rgba(0,0,0,0.9);
-    z-index: 10;
-  }}
-
-  .word.passed {{
-    color: #ffffff;
-    opacity: 1;
+    transform: scale(1.15);
   }}
 
   /* ── Mode switcher (top-right, appears on hover) ── */
-  .mode-bar {{
-    position: absolute;
-    top: 12px; right: 14px;
-    display: flex; gap: 6px;
-    z-index: 200;
-    opacity: 0;
-    transition: opacity 0.25s;
-  }}
-  .player-wrap:hover .mode-bar {{ opacity: 1; }}
+  /* Mode bar removed as requested */
 
   .m-btn {{
     background: rgba(0,0,0,0.65);
@@ -309,12 +289,7 @@ def render_youtube_player(
     <source src="data:{mime_type};base64,{video_b64}" type="{mime_type}">
   </{tag}>
 
-  <!-- Mode switcher -->
-  <div class="mode-bar">
-    <button class="m-btn"    data-mode="1">1-Word</button>
-    <button class="m-btn"    data-mode="2">Progressive</button>
-    <button class="m-btn on" data-mode="3">Karaoke</button>
-  </div>
+  <!-- No switcher -->
 
   <!-- Subtitle overlay -->
   <div class="sub-overlay">
@@ -336,7 +311,7 @@ def render_youtube_player(
 const vid   = document.getElementById('vid');
 const cbox  = document.getElementById('cbox');
 const words = Array.from(document.querySelectorAll('.word'));
-let mode    = 3;   // 1 = 1-Word  |  2 = Progressive  |  3 = Karaoke (YouTube style)
+let mode    = 1;   // Forced to Word-by-word mode
 
 /* ── Pre-compute phrase groups (burst gap > 0.9s → new phrase) ── */
 const phrases = [];
@@ -425,44 +400,17 @@ function render() {{
   hideAll();
   cbox.classList.add('show');
 
-  if (mode === 1) {{
-    /* ─ 1-Word: only the active word ─ */
-    if (activeIdx >= 0) {{
-      phrase[activeIdx].style.display = 'inline-block';
-      phrase[activeIdx].classList.add('active');
-    }}
-
-  }} else if (mode === 2) {{
-    /* ─ Progressive: words accumulate ─ */
-    const limit = activeIdx >= 0 ? activeIdx : 0;
-    phrase.forEach((w, i) => {{
-      if (i <= limit) {{
-        w.style.display = 'inline-block';
-        if (i === limit) w.classList.add('active');
-        else             w.classList.add('passed');
-      }}
-    }});
-
-  }} else {{
-    /* ─ Karaoke: full phrase, colour current ─ */
-    phrase.forEach((w, i) => {{
-      w.style.display = 'inline-block';
-      if (i === activeIdx)     w.classList.add('active');
-      else if (i < activeIdx)  w.classList.add('passed');
-    }});
+  /* Only 1-Word display */
+  if (activeIdx >= 0) {{
+    phrase[activeIdx].style.display = 'inline-block';
+    phrase[activeIdx].classList.add('active');
   }}
 
   requestAnimationFrame(render);
 }}
 
 /* ── Mode buttons ── */
-document.querySelectorAll('.m-btn').forEach(btn => {{
-  btn.addEventListener('click', () => {{
-    document.querySelectorAll('.m-btn').forEach(b => b.classList.remove('on'));
-    btn.classList.add('on');
-    mode = parseInt(btn.dataset.mode);
-  }});
-}});
+/* Mode buttons removed */
 
 /* ── Word click → seek ── */
 words.forEach(w => {{
