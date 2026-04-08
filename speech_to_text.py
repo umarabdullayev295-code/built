@@ -105,6 +105,8 @@ class SpeechToText:
                     results = self._align_with_whisper(results, audio_path)
                 
                 if results:
+                    # Yangi: Ovoz to'lqini bilan millisekundlik tekshirish (Energy Refinement)
+                    results = self._refine_timestamps_with_audio(results, audio_path)
                     return results
             except Exception as e:
                 # DNS yoki internet xatosi bo'lsa tinchgina Whisperga o'tamiz
@@ -288,3 +290,41 @@ class SpeechToText:
 
     def get_full_text(self, segments: List[Dict]) -> str:
         return " ".join(s["text"] for s in segments if s.get("text"))
+
+    def _refine_timestamps_with_audio(self, segments: List[Dict], audio_path: str) -> List[Dict]:
+        """
+        Ovoz to'lqinini (PCM) tahlil qilib, so'zlarning boshlanish vaqtini 
+        haqiqiy tovush energiyasiga qarab millisekundlarda to'g'rilaydi.
+        """
+        try:
+            import soundfile as sf
+            import numpy as np
+            
+            data, samplerate = sf.read(audio_path)
+            # Monoga o'tkazish
+            if len(data.shape) > 1:
+                data = np.mean(data, axis=1)
+                
+            refined = []
+            for seg in segments:
+                start_s = seg["start"]
+                # 100ms oldin va keyinni tekshiramiz
+                search_start = max(0, int((start_s - 0.1) * samplerate))
+                search_end = min(len(data), int((start_s + 0.1) * samplerate))
+                
+                chunk = np.abs(data[search_start:search_end])
+                if len(chunk) > 0:
+                    threshold = np.max(chunk) * 0.15  # 15% energiya chegarasi
+                    indices = np.where(chunk > threshold)[0]
+                    if len(indices) > 0:
+                        first_peak_idx = indices[0]
+                        actual_start = (search_start + first_peak_idx) / samplerate
+                        # Faqat katta farq bo'lmasa to'g'rilaymiz
+                        if abs(actual_start - start_s) < 0.08:
+                            seg["start"] = round(actual_start, 3)
+                
+                refined.append(seg)
+            return refined
+        except Exception as e:
+            print(f"[STT] Refinement error: {e}")
+            return segments
