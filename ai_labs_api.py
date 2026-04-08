@@ -138,15 +138,68 @@ class MuxlisaClient:
             return False
         # Muxlisa uchun hozircha key borligini tekshirish kifoya
         return bool(self.api_key)
+# ─── Deepgram AI ───
+DEEPGRAM_API_URL = "https://api.deepgram.com/v1/listen?model=nova-2&smart_format=true&utterances=true&punctuate=true&words=true"
+
+class DeepgramClient:
+    """
+    Deepgram STT API - Yuqori tezlik va aniqlik.
+    Millisekundlik vaqtlar (word-level) bilan qaytaradi.
+    """
+    def __init__(self, api_key: str = None):
+        self.api_key = api_key or os.environ.get("DEEPGRAM_API_KEY")
+        self.available = bool(self.api_key)
+
+    def is_available(self) -> bool:
+        return self.available
+
+    def transcribe_audio(self, audio_path: str, language: str = "uz") -> List[Dict]:
+        if not self.available:
+            return []
+
+        # Deepgram tili uz-UZ formatida bo'lishi kerak
+        dg_lang = "uz" if language == "uz" else language
+        url = DEEPGRAM_API_URL + f"&language={dg_lang}"
+        
+        headers = {
+            "Authorization": f"Token {self.api_key}",
+            "Content-Type": "audio/wav"
+        }
+
+        try:
+            with open(audio_path, "rb") as f:
+                with httpx.Client(timeout=120.0) as client:
+                    response = client.post(url, headers=headers, content=f.read())
+                    
+                    if response.status_code == 200:
+                        data = response.json()
+                        words_data = data.get("results", {}).get("channels", [{}])[0].get("alternatives", [{}])[0].get("words", [])
+                        
+                        segments = []
+                        for winfo in words_data:
+                            segments.append({
+                                "start": round(winfo["start"], 3),
+                                "end": round(winfo["end"], 3),
+                                "text": winfo["punctuated_word"] or winfo["word"]
+                            })
+                        return segments
+                    else:
+                        print(f"[Deepgram] Error {response.status_code}: {response.text}")
+        except Exception as e:
+            print(f"[Deepgram] Connection error: {e}")
+        return []
 
 
-def get_best_api_client(engine_name: str = "Muxlisa AI (Pro)"):
+def get_best_api_client(engine_name: str = "Muxlisa AI (Uzbek Pro)"):
     """
-    Mavjud eng yaxshi API mijozini qaytaradi.
-    Faqat Muxlisa AI qo'llab-quvvatlanadi.
+    Mavjud API mijozlarni tanlash.
     """
+    if "Deepgram" in engine_name:
+        dg = DeepgramClient()
+        if dg.is_available(): return dg, "Deepgram AI"
+
     muxlisa = MuxlisaClient()
     if muxlisa.is_available():
-        return muxlisa, "Muxlisa AI (Pro)"
+        return muxlisa, "Muxlisa AI (Uzbek Pro)"
 
     return None, None

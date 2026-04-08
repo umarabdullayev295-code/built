@@ -422,17 +422,23 @@ with st.sidebar:
         if st.session_state.target_lang == "uz":
             engine_choice = st.selectbox(
                 "Transkripsiya modeli:",
-                ["Muxlisa AI (Uzbek Pro)", "Whisper (Asosiy)"],
+                ["Muxlisa AI (Uzbek Pro)", "Deepgram AI (Fast)", "Whisper (Asosiy)"],
                 index=0,
-                help="O'zbek tili uchun 'Muxlisa AI' tavsiya etiladi."
+                help="O'zbek tili uchun 'Muxlisa AI' yoki 'Deepgram' tavsiya etiladi."
             )
         else:
-            engine_choice = "Whisper (Asosiy)"
-            st.info(f"💡 {lang_choice} tili uchun Whisper qo'llaniladi.")
-
-        if engine_choice == "Muxlisa AI (Uzbek Pro)":
+            engine_choice = st.selectbox(
+                "Transkripsiya modeli:",
+                ["Deepgram AI (Fast)", "Whisper (Asosiy)"],
+                index=0
+            )
+        
+        if "Muxlisa" in engine_choice:
             st.success("🛰️ Muxlisa AI (National) faol.")
+        elif "Deepgram" in engine_choice:
+            st.success("⚡ Deepgram AI (High-Speed) faol.")
         else:
+            # Whisper sozlamalari
             st.session_state["whisper_model"] = st.selectbox(
                 "Whisper model hajmi:",
                 ["tiny", "base", "small", "medium", "large-v2", "large-v3"],
