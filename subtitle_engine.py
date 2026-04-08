@@ -39,6 +39,8 @@ def render_youtube_player(video_path: str, segments: List[Dict], start_time: flo
     
     tag = "audio" if is_audio else "video"
 
+    autoplay_attr = "autoplay" if start_time > 0 else ""
+
     # HTML/CSS/JS Component
     html_code = f"""
     <style>
@@ -148,7 +150,7 @@ def render_youtube_player(video_path: str, segments: List[Dict], start_time: flo
     </style>
 
     <div class="player-container">
-        <{tag} id="mainMedia" controls crossorigin="anonymous" style="width:100%; height:100%;">
+        <{tag} id="mainMedia" controls {autoplay_attr} crossorigin="anonymous" style="width:100%; height:100%;">
             <source src="data:{mime_type};base64,{video_b64}" type="{mime_type}">
         </{tag}>
         
@@ -182,10 +184,16 @@ def render_youtube_player(video_path: str, segments: List[Dict], start_time: flo
 
         media.addEventListener('loadedmetadata', () => {{
             media.currentTime = {start_time};
+            if ({start_time} > 0) {{
+                media.play().catch(e => console.log("Autoplay blocked:", e));
+            }}
         }});
         
         if (media.readyState >= 1) {{
             media.currentTime = {start_time};
+            if ({start_time} > 0) {{
+                media.play().catch(e => console.log("Autoplay blocked:", e));
+            }}
         }}
 
         function updateSubtitles() {{
