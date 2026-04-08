@@ -62,14 +62,11 @@ def scale_timestamps(
     # Barcha so'zlardan maksimal vaqtni aniqlaymiz
     max_timestamp = max(s.get("end", 0) for s in segments)
 
-    # Video va subtitr uzunliklari g'oyat farq qilsa, bu "Audio sekinroq" degani Emas!
-    # Bu shunchaki AI oxirgi jimjitlikni hisoblamay qolgan! (early cutoff).
-    # Faqat kichik xatoliklarni (1-3% gacha) to'g'irlaymiz, aks holda barcha so'zlar sekinlashib "kech chiqadi".
-    
+    # Video va subtitr uzunliklari o'rtasidagi farq nisbati
     diff_ratio = abs(video_duration - max_timestamp) / video_duration
     
-    # Faqat 5% dan kamroq xatolik bo'lsa scale qilamiz (clock offset)
-    if max_timestamp > 0 and 0.02 < diff_ratio < 0.05:
+    # Subtitrlar va video orasidagi farq 15% gacha bo'lsa scale qilamiz.
+    if max_timestamp > 0 and 0.001 < diff_ratio < 0.15:
         scale = video_duration / max_timestamp
 
         if debug:
@@ -344,8 +341,10 @@ let mode    = 3;   // 1 = 1-Word  |  2 = Progressive  |  3 = Karaoke (YouTube st
 const phrases = [];
 let cur = [];
 let maxTimestamp = 0;
-// Add a small negative offset for perception 
-const PERCEPTION_OFFSET = 0.08;
+// Resetting offset to 0 because user reported it's already ahead
+const PERCEPTION_OFFSET = 0.0; 
+// Minor delay adjustment to prevent appearing too early
+const SYNC_DELAY = 0.05; 
 
 words.forEach((w, idx) => {{
   const st = parseFloat(w.dataset.start);
@@ -395,8 +394,8 @@ function findActiveIdx(phrase, ct) {{
   for (let i = 0; i < phrase.length; i++) {{
     const rawSt = parseFloat(phrase[i].dataset.start);
     const rawEnd = parseFloat(phrase[i].dataset.end);
-    const ws = rawSt - PERCEPTION_OFFSET;
-    const we = rawEnd - (PERCEPTION_OFFSET / 2) + 0.08; // tiny tolerance
+    const ws = rawSt + SYNC_DELAY;
+    const we = rawEnd + SYNC_DELAY + 0.08; 
     if (ct >= ws && ct <= we) return i;
   }}
   /* If we're inside the phrase window but between two words, use last spoken */
