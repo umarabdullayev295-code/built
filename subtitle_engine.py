@@ -318,7 +318,7 @@ const phrases = [];
 let cur = [];
 let maxTimestamp = 0;
 // Global sync adjustment
-const PERCEPTION_OFFSET = 0.0; 
+const PERCEPTION_OFFSET = 0.045; 
 const MANUAL_LATENCY    = {latency_offset}; 
 const SYNC_DELAY        = 0.0 + MANUAL_LATENCY; 
 
@@ -370,7 +370,7 @@ function findActiveIdx(phrase, ct) {{
   for (let i = 0; i < phrase.length; i++) {{
     const rawSt = parseFloat(phrase[i].dataset.start);
     const rawEnd = parseFloat(phrase[i].dataset.end);
-    const ws = rawSt + SYNC_DELAY;
+    const ws = rawSt + SYNC_DELAY - PERCEPTION_OFFSET;
     const we = rawEnd + SYNC_DELAY + 0.08; 
     if (ct >= ws && ct <= we) return i;
   }}
