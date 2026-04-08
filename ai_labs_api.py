@@ -45,6 +45,8 @@ class MuxlisaClient:
                 self.api_key = st.secrets.get("MUXLISA_API_KEY")
             except Exception:
                 pass
+        if self.api_key:
+            self.api_key = str(self.api_key).strip().strip('"')
         self.available = bool(self.api_key)
 
     def is_available(self) -> bool:
@@ -154,6 +156,8 @@ class DeepgramClient:
                 self.api_key = st.secrets.get("DEEPGRAM_API_KEY")
             except Exception:
                 pass
+        if self.api_key:
+            self.api_key = str(self.api_key).strip().strip('"')
         self.available = bool(self.api_key)
 
     def is_available(self) -> bool:
