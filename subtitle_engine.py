@@ -62,22 +62,20 @@ def scale_timestamps(
     # Barcha so'zlardan maksimal vaqtni aniqlaymiz
     max_timestamp = max(s.get("end", 0) for s in segments)
 
-    if debug:
-        st.info(
-            f"📊 **Debug Info:**  \n"
-            f"- Video davomiyligi: **{video_duration:.2f}s**  \n"
-            f"- Subtitrlardagi max vaqt: **{max_timestamp:.2f}s**  \n"
-            f"- Farq: **{abs(video_duration - max_timestamp):.2f}s**"
-        )
-
-    # Agar farq 0.5 soniyadan katta bo'lsa — scale qilish kerak
-    if max_timestamp > 0 and abs(video_duration - max_timestamp) > 0.5:
+    # Video va subtitr uzunliklari g'oyat farq qilsa, bu "Audio sekinroq" degani Emas!
+    # Bu shunchaki AI oxirgi jimjitlikni hisoblamay qolgan! (early cutoff).
+    # Faqat kichik xatoliklarni (1-3% gacha) to'g'irlaymiz, aks holda barcha so'zlar sekinlashib "kech chiqadi".
+    
+    diff_ratio = abs(video_duration - max_timestamp) / video_duration
+    
+    # Faqat 5% dan kamroq xatolik bo'lsa scale qilamiz (clock offset)
+    if max_timestamp > 0 and 0.02 < diff_ratio < 0.05:
         scale = video_duration / max_timestamp
 
         if debug:
             st.warning(
                 f"⚠️ **Timing noto'g'ri!** Scale koeffitsienti: **{scale:.3f}x**  \n"
-                f"Barcha {len(segments)} ta so'z vaqtlari avtomatik to'g'irlanmoqda..."
+                f"Barcha {len(segments)} ta so'z vaqtlari ozgina to'g'irlanmoqda..."
             )
 
         scaled = []
@@ -94,7 +92,7 @@ def scale_timestamps(
         return scaled
 
     if debug:
-        st.success("✅ Timing aniq — scale kerak emas")
+        st.success("✅ Timing aniq — (Katta siljish mavjud emas)")
 
     return segments
 
@@ -248,7 +246,6 @@ def render_youtube_player(
     font-size: clamp(1.4rem, 4vw, 2.6rem);
     font-weight: 800;
     color: rgba(255,255,255,0.55);
-    text-transform: uppercase;
     letter-spacing: 0.03em;
     text-shadow: 1px 1px 6px rgba(0,0,0,0.9);
     cursor: pointer;
@@ -346,12 +343,15 @@ let mode    = 1;   // 1 = 1-Word  |  2 = Progressive  |  3 = Karaoke
 const phrases = [];
 let cur = [];
 let maxTimestamp = 0;
-words.forEach((w, idx) => {{
-  const st = parseFloat(w.dataset.start);
-  const end = parseFloat(w.dataset.end);
-  if (end > maxTimestamp) maxTimestamp = end;
+// Add a negative offset so words visually pop slightly BEFORE the sound, eliminating any perceived lag!
+const PERCEPTION_OFFSET = 0.15;
 
-  const prevEnd = cur.length ? parseFloat(cur[cur.length-1].dataset.end) : 0;
+words.forEach((w, idx) => {{
+  const st = parseFloat(w.dataset.start) - PERCEPTION_OFFSET;
+  const end = parseFloat(w.dataset.end) - (PERCEPTION_OFFSET / 2);
+  if (parseFloat(w.dataset.end) > maxTimestamp) maxTimestamp = parseFloat(w.dataset.end);
+
+  const prevEnd = cur.length ? (parseFloat(cur[cur.length-1].dataset.end) - (PERCEPTION_OFFSET / 2)) : 0;
   if (idx > 0 && (st - prevEnd > 0.9 || cur.length >= 8)) {{
     phrases.push(cur);
     cur = [w];
@@ -391,15 +391,17 @@ function findActivePhrase(ct) {{
 function findActiveIdx(phrase, ct) {{
   /* Returns index of the currently-spoken word within phrase (-1 if none) */
   for (let i = 0; i < phrase.length; i++) {{
-    const ws = parseFloat(phrase[i].dataset.start);
-    const we = parseFloat(phrase[i].dataset.end) + 0.08; // tiny tolerance
+    const rawSt = parseFloat(phrase[i].dataset.start);
+    const rawEnd = parseFloat(phrase[i].dataset.end);
+    const ws = rawSt - PERCEPTION_OFFSET;
+    const we = rawEnd - (PERCEPTION_OFFSET / 2) + 0.08; // tiny tolerance
     if (ct >= ws && ct <= we) return i;
   }}
   /* If we're inside the phrase window but between two words, use last spoken */
   const ct2 = ct;
   let last = -1;
   for (let i = 0; i < phrase.length; i++) {{
-    if (ct2 >= parseFloat(phrase[i].dataset.start)) last = i;
+    if (ct2 >= (parseFloat(phrase[i].dataset.start) - PERCEPTION_OFFSET)) last = i;
     else break;
   }}
   return last;
