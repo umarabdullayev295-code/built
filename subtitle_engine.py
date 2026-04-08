@@ -214,12 +214,11 @@ def render_youtube_player(
   }}
 
   .caption-box {{
-    background: rgba(0,0,0,0.62);
-    backdrop-filter: blur(6px);
-    -webkit-backdrop-filter: blur(6px);
-    border: 1px solid rgba(255,255,255,0.08);
+    background: rgba(0,0,0,0.7);
+    border: 1px solid rgba(255,255,255,0.15);
     border-radius: 18px;
     padding: 14px 28px;
+    will-change: transform, opacity;
     max-width: 90%;
     display: flex;
     flex-wrap: wrap;
@@ -320,7 +319,7 @@ let maxTimestamp = 0;
 // Global sync adjustment
 const PERCEPTION_OFFSET = 0.0; 
 const MANUAL_LATENCY    = {latency_offset}; 
-const SYNC_DELAY        = 0.1 + MANUAL_LATENCY; 
+const SYNC_DELAY        = -0.15 + MANUAL_LATENCY; 
 
 words.forEach((w, idx) => {{
   const st = parseFloat(w.dataset.start);
@@ -358,8 +357,8 @@ function hideAll() {{
 
 function findActivePhrase(ct) {{
   for (const ph of phrases) {{
-    const ps = parseFloat(ph[0].dataset.start) - 0.2;
-    const pe = parseFloat(ph[ph.length-1].dataset.end) + 0.1;
+    const ps = parseFloat(ph[0].dataset.start) + SYNC_DELAY - 0.2;
+    const pe = parseFloat(ph[ph.length-1].dataset.end) + SYNC_DELAY + 0.1;
     if (ct >= ps && ct <= pe) return ph;
   }}
   return null;
