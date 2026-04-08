@@ -594,10 +594,15 @@ if st.session_state.processing and st.session_state.video_path:
         )
         st.session_state.stt_engine = stt
         st.session_state.engine_name = stt.get_engine_name()
-
         segments = stt.transcribe(audio_path)
+        
+        # Qat'iy global autoscale: Barcha modullar (SRT, semantic_search, player) uchun 
+        # faqat moslashtirilgan mukammal time o'zlashtiriladi!
+        if segments and st.session_state.video_duration > 0:
+            from subtitle_engine import scale_timestamps
+            segments = scale_timestamps(segments, st.session_state.video_duration, debug=False)
+            
         st.session_state.segments = segments
-
         # Temp audio faylni o'chirish
         from utils import cleanup_file
         cleanup_file(audio_path)
