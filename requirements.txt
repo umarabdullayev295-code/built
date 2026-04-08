@@ -7,3 +7,5 @@ faiss-cpu
 sentence-transformers
 numpy
 soundfile
+torch
+torchvision
