@@ -161,8 +161,8 @@ class SpeechToText:
                         # Eng yaqin so'zlar soniga moslaymiz
                         for i in range(min(len(m_words), len(w_sub))):
                             aligned.append({
-                                "start": w_sub[i]["start"],
-                                "end": w_sub[i]["end"],
+                                "start": round(w_sub[i]["start"], 3),
+                                "end": round(w_sub[i]["end"], 3),
                                 "text": m_words[i]
                             })
                         continue
@@ -263,8 +263,8 @@ class SpeechToText:
                         w_text = w.word.strip()
                         if w_text:
                             result.append({
-                                "start": round(w.start, 2),
-                                "end": round(w.end, 2),
+                                "start": round(w.start, 3),
+                                "end": round(w.end, 3),
                                 "text": w_text,
                             })
                 else:

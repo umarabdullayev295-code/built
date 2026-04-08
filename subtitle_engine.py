@@ -246,14 +246,15 @@ def render_youtube_player(
     letter-spacing: -0.01em;
     text-shadow: 2px 2px 10px rgba(0,0,0,1);
     transition:
-      color       0.06s ease-out,
-      transform   0.08s cubic-bezier(0.2, 0, 0.2, 1);
+      color       0.05s ease-out,
+      transform   0.07s cubic-bezier(0, 0, 0.2, 1);
   }}
 
   .word.active {{
     display: inline-block;
     color: #ffcc00; 
-    transform: scale(1.15);
+    transform: scale(1.12) translateY(-2px);
+    text-shadow: 0 0 8px rgba(255, 204, 0, 0.4);
   }}
 
   /* ── Mode switcher (top-right, appears on hover) ── */
