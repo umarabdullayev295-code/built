@@ -419,14 +419,18 @@ with st.sidebar:
 
     # --- AI Engine sozlamalari ---
     with st.expander("🤖 AI Dvigatel", expanded=True):
-        engine_choice = st.selectbox(
-            "Transkripsiya modeli:",
-            ["Muxlisa AI (Pro)", "Whisper (Asosiy)"],
-            index=0 if st.session_state.target_lang == "uz" else 1,
-            help="O'zbek tili uchun 'Muxlisa AI' tavsiya etiladi.",
-        )
+        if st.session_state.target_lang == "uz":
+            engine_choice = st.selectbox(
+                "Transkripsiya modeli:",
+                ["Muxlisa AI (Uzbek Pro)", "Whisper (Asosiy)"],
+                index=0,
+                help="O'zbek tili uchun 'Muxlisa AI' tavsiya etiladi."
+            )
+        else:
+            engine_choice = "Whisper (Asosiy)"
+            st.info(f"💡 {lang_choice} tili uchun Whisper qo'llaniladi.")
 
-        if engine_choice == "Muxlisa AI (Pro)":
+        if engine_choice == "Muxlisa AI (Uzbek Pro)":
             st.success("🛰️ Muxlisa AI (National) faol.")
         else:
             st.session_state["whisper_model"] = st.selectbox(

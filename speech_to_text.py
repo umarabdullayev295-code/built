@@ -92,9 +92,9 @@ class SpeechToText:
             print(f"[STT] Fayl topilmadi: {audio_path}")
             return []
 
-        # API orqali
+        # Faqat o'zbek tili uchun Muxlisa AI'ni ishlatamiz
         client = self._api_client
-        if client is not None and client.is_available():
+        if client is not None and client.is_available() and self.language == "uz":
             try:
                 print(f"[STT] {self.active_engine} orqali tahlil qilinmoqda...")
                 results = client.transcribe_audio(audio_path, language=self.language)
