@@ -320,7 +320,7 @@ let maxTimestamp = 0;
 // Global sync adjustment
 const PERCEPTION_OFFSET = 0.0; 
 const MANUAL_LATENCY    = {latency_offset}; 
-const SYNC_DELAY        = 0.05 + MANUAL_LATENCY; 
+const SYNC_DELAY        = 0.45 + MANUAL_LATENCY; 
 
 words.forEach((w, idx) => {{
   const st = parseFloat(w.dataset.start);
