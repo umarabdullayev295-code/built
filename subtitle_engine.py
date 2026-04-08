@@ -83,7 +83,7 @@ def render_youtube_player(video_path: str, segments: List[Dict], start_time: flo
 
         .subtitle-overlay {{
             position: absolute;
-            bottom: 12%;
+            top: 60%;
             left: 0;
             right: 0;
             text-align: center;
@@ -92,62 +92,43 @@ def render_youtube_player(video_path: str, segments: List[Dict], start_time: flo
             display: flex;
             justify-content: center;
             padding: 0 20px;
+            transform: translateY(-50%);
         }}
 
         .caption-box {{
-            background: rgba(0, 0, 0, 0.75);
-            backdrop-filter: blur(8px);
+            background: transparent;
             padding: 10px 20px;
-            border-radius: 12px;
             max-width: 90%;
             display: none;
             flex-wrap: wrap;
             justify-content: center;
             align-items: center;
-            border: 1px solid rgba(255,255,255,0.1);
-            transition: all 0.3s ease;
+            transition: all 0.1s ease;
         }}
 
         .word {{
             display: none;
-            font-size: 1.3rem;
-            color: rgba(255, 255, 255, 0.6);
-            margin: 0 5px;
-            transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-            font-weight: 600;
+            font-size: 2.5rem;
+            color: rgba(255, 255, 255, 0.9);
+            margin: 0 8px;
+            font-weight: 800;
             cursor: pointer;
             pointer-events: auto;
-            display: inline-block;
-            opacity: 0;
-            transform: translateY(5px);
-        }}
-
-        .word.visible {{
-            opacity: 1;
-            transform: translateY(0);
+            text-shadow: 2px 2px 0 #000, -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000, 1px 1px 0 #000;
+            text-transform: uppercase;
         }}
 
         .word.active {{
-            color: #ffffff;
-            font-weight: 900;
-            transform: scale(1.2) translateY(-2px);
-            text-shadow: 0 0 20px rgba(255,255,255,0.8), 
-                         0 0 10px rgba(255,255,255,1),
-                         2px 2px 4px rgba(0,0,0,0.8);
+            color: #ffd700;
+            transform: scale(1.1);
+            text-shadow: 0 0 20px rgba(255,215,0,0.8), 2px 2px 4px rgba(0,0,0,1);
             z-index: 10;
         }}
 
         @media (max-width: 768px) {{
-            .subtitle-overlay {{
-                bottom: 12%;
-            }}
-            .caption-box {{
-                max-width: 95%;
-                padding: 6px 12px;
-            }}
             .word {{
-                font-size: 1.1rem;
-                margin: 0 3px;
+                font-size: 1.8rem;
+                margin: 0 4px;
             }}
         }}
     </style>
@@ -169,22 +150,6 @@ def render_youtube_player(video_path: str, segments: List[Dict], start_time: flo
         const words = Array.from(document.querySelectorAll('.word'));
         const captionBox = document.getElementById('captionBox');
 
-        const phrases = [];
-        let currentPhrase = [];
-        
-        words.forEach((w, index) => {{
-            const start = parseFloat(w.dataset.start);
-            const prevEnd = currentPhrase.length > 0 ? parseFloat(currentPhrase[currentPhrase.length-1].dataset.end) : 0;
-            
-            if (index > 0 && (start - prevEnd > 0.8 || currentPhrase.length >= 10)) {{
-                phrases.push(currentPhrase);
-                currentPhrase = [w];
-            }} else {{
-                currentPhrase.push(w);
-            }}
-        }});
-        if (currentPhrase.length > 0) phrases.push(currentPhrase);
-
         media.addEventListener('loadedmetadata', () => {{
             media.currentTime = {start_time};
             if ({start_time} > 0) {{
@@ -201,40 +166,24 @@ def render_youtube_player(video_path: str, segments: List[Dict], start_time: flo
 
         function updateSubtitles() {{
             const ct = media.currentTime;
-            let activePhrase = null;
-
-            for (const phrase of phrases) {{
-                const phraseStart = parseFloat(phrase[0].dataset.start);
-                const phraseEnd = parseFloat(phrase[phrase.length-1].dataset.end);
-                
-                if (ct >= phraseStart - 0.2 && ct <= phraseEnd + 0.5) {{
-                    activePhrase = phrase;
-                    break;
-                }}
-            }}
+            let foundActive = false;
 
             words.forEach(w => {{
-                w.style.display = 'none';
-                w.classList.remove('active', 'visible');
+                const start = parseFloat(w.dataset.start);
+                const end = parseFloat(w.dataset.end);
+                
+                // Active window slightly padded for smoothness
+                if (ct >= start - 0.05 && ct <= end + 0.05) {{
+                    w.style.display = 'inline-block';
+                    w.classList.add('active');
+                    foundActive = true;
+                }} else {{
+                    w.style.display = 'none';
+                    w.classList.remove('active');
+                }}
             }});
             
-            if (activePhrase) {{
-                captionBox.style.display = 'flex';
-                activePhrase.forEach(w => {{
-                    w.style.display = 'inline-block';
-                    w.classList.add('visible');
-                    
-                    const start = parseFloat(w.dataset.start);
-                    const end = parseFloat(w.dataset.end);
-                    
-                    if (ct >= start && ct <= end) {{
-                        w.classList.add('active');
-                    }}
-                }});
-            }} else {{
-                captionBox.style.display = 'none';
-            }}
-
+            captionBox.style.display = foundActive ? 'flex' : 'none';
             requestAnimationFrame(updateSubtitles);
         }}
 
