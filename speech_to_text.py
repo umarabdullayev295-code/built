@@ -145,59 +145,38 @@ class SpeechToText:
                 padding = 0.4
                 return [{"start": i*padding, "end": (i+1)*padding, "text": w} for i, w in enumerate(muxlisa_words)]
 
-            # 3. Protsentga asoslangan (Proportional) sinxronizatsiya
-            # Muxlisa matnini butun Whisper davomiyligi bo'ylab tekis va mantiqiy taqsimlaymiz
-            aligned = []
-            
-            # Whisper segmentlaridan haqiqiy vaqt interval va bo'shliqlarni (VAD gaps) olamiz
-            # Bu orqali qachon jimjitlik bo'lsa o'sha joyga so'z tushib qolishi oldini olinadi!
-            whisper_intervals = []
-            for w in whisper_results:
-                whisper_intervals.append((w["start"], w["end"]))
-                
-            if not whisper_intervals:
-                # Agar Whisper umuman ishlamasa, avtomatik tekis taqsimot
-                padding = 0.4
-                return [{"start": i*padding, "end": (i+1)*padding, "text": w} for i, w in enumerate(muxlisa_words)]
-                
-            # Haqiqiy so'zlashuv davomiyligi (faqat gapirilayotgan soniyalar)
-            total_speech_duration = sum(end - start for start, end in whisper_intervals)
-            
-            # Har bir Muxlisa so'ziga qanchadan vaqt tushadi
-            m_count = len(muxlisa_words)
-            time_per_word = total_speech_duration / m_count if m_count > 0 else 0.4
-            
-            current_interval_idx = 0
-            current_interval_used = 0.0
-            
+            # 3. Indeks (Index-based) Proportional Sinxronizatsiya
+            # Muxlisa matnini Whisper so'zlariga proportsional vaqt indeksida bog'laymiz
+            # Bu algoritm so'zlashuv tezligi (pauzalar, tez gapirish)ni mukammal saqlab qoladi!
+            grouped = {}
             for i, word in enumerate(muxlisa_words):
-                if current_interval_idx >= len(whisper_intervals):
-                    # Vaqt tugab qolsa ham so'zlarni oxiriga yopishtirib qolmaymiz
-                    last_end = whisper_intervals[-1][1] if whisper_intervals else 0
-                    start = last_end + (i - len(aligned)) * 0.4
-                    end = start + 0.4
-                    aligned.append({"start": round(start, 2), "end": round(end, 2), "text": word})
-                    continue
-                    
-                start_time = whisper_intervals[current_interval_idx][0] + current_interval_used
-                end_time = start_time + time_per_word
+                w_idx = int((i / m_count) * w_count)
+                w_idx = min(w_idx, w_count - 1)
                 
-                # Agar bitta word intervaldan chiqib ketsa, uning qismini keyingi intervalga yopishtirmaymiz
-                # balki uni joriy interval oxiriga taqaymiz va intervalni o'zgartiramiz
-                if end_time > whisper_intervals[current_interval_idx][1]:
-                    # Juda uzun so'z bo'lsa yoki interval kalta bo'lsa, uni shu joyda tugatamiz
-                    end_time = whisper_intervals[current_interval_idx][1]
-                    current_interval_idx += 1
-                    current_interval_used = 0.0
-                else:
-                    current_interval_used += time_per_word
-                    
-                aligned.append({
-                    "start": round(start_time, 2),
-                    "end": round(end_time, 2),
-                    "text": word
-                })
+                if w_idx not in grouped:
+                    grouped[w_idx] = []
+                grouped[w_idx].append(word)
                 
+            aligned = []
+            for w_idx in sorted(grouped.keys()):
+                words_list = grouped[w_idx]
+                w_start = whisper_results[w_idx]["start"]
+                w_end = whisper_results[w_idx]["end"]
+                
+                # Agar bir nechta so'z bitta Whisper o'rniga tushsa, vaqtni xolis bo'lamiz
+                c = len(words_list)
+                step = (w_end - w_start) / c if c > 0 else 0
+                
+                for idx, word in enumerate(words_list):
+                    t_start = w_start + idx * step
+                    t_end = w_start + (idx + 1) * step
+                    
+                    aligned.append({
+                        "start": round(t_start, 3),
+                        "end": round(t_end, 3),
+                        "text": word
+                    })
+                    
             return aligned
         except Exception as e:
             print(f"[STT] Alignment hatosi: {e}")
