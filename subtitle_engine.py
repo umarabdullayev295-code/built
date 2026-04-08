@@ -169,11 +169,13 @@ def render_youtube_player(video_path: str, segments: List[Dict], start_time: flo
             let foundActive = false;
 
             words.forEach(w => {{
-                const start = parseFloat(w.dataset.start);
-                const end = parseFloat(w.dataset.end);
+                // Add a small delay offset (0.25s) because Whisper VAD timestamps often start too early
+                const offset = 0.25; 
+                const start = parseFloat(w.dataset.start) + offset;
+                const end = parseFloat(w.dataset.end) + offset;
                 
-                // Active window slightly padded for smoothness
-                if (ct >= start - 0.05 && ct <= end + 0.05) {{
+                // Show words tightly within their adjusted timestamps 
+                if (ct >= start && ct <= end) {{
                     w.style.display = 'inline-block';
                     w.classList.add('active');
                     foundActive = true;
