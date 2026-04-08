@@ -99,27 +99,10 @@ class SpeechToText:
                 print(f"[STT] {self.active_engine} orqali tahlil qilinmoqda...")
                 results = client.transcribe_audio(audio_path, language=self.language)
                 
-                # Tez ishlashi uchun Whisper alignment bloklandi (Juda ko'p o'ylamasligi uchun)
+                # Yangi: Muxlisa AI uchun Hybrid Alignment (100% aniq vaqt)
                 if results and any(r.get("type") == "muxlisa_raw" for r in results):
-                    print("[STT] Muxlisa AI tezkor rejimi... (Whisper alignment o'chirildi)")
-                    fast_results = []
-                    for r in results:
-                        if r.get("type") == "muxlisa_raw":
-                            text = r.get("text", "")
-                            start = float(r.get("start", 0.0))
-                            end = float(r.get("end", 60.0))
-                            words = text.split()
-                            if words:
-                                step = (end - start) / len(words)
-                                for i, w in enumerate(words):
-                                    fast_results.append({
-                                        "start": round(start + i * step, 2),
-                                        "end": round(start + (i + 1) * step, 2),
-                                        "text": w
-                                    })
-                        else:
-                            fast_results.append(r)
-                    results = fast_results
+                    print("[STT] Muxlisa AI matni Whisper orqali aniq vaqtga tekislanmoqda...")
+                    results = self._align_with_whisper(results, audio_path)
                 
                 if results:
                     return results
@@ -138,16 +121,16 @@ class SpeechToText:
         Muxlisa AI matnini Whisper vaqtlariga 100% aniqlik bilan bog'laydi.
         """
         try:
-            # 1. Muxlisa matnini olish
-            full_text = results[0].get("text", "")
+            # 1. Muxlisa matnini olish, bir necha qism yig'ilganda ularni bitta qilib birlashtiramiz
+            full_text = " ".join(r.get("text", "") for r in results if r.get("type") == "muxlisa_raw")
             muxlisa_words = [w.strip() for w in full_text.split() if w.strip()]
             if not muxlisa_words:
                 return results
 
             # 2. Whisper (Tezkor lekin aniq) orqali vaqtlarni aniqlash
             orig_size = self.whisper_model_size
-            # 'small' o'zbek tili uchun 'base' dan ancha aniqroq
-            self.whisper_model_size = "small" 
+            # tez ishlashi uchun 'base' ni ishlatamiz
+            self.whisper_model_size = "base" 
             whisper_results = self._transcribe_whisper(audio_path)
             self.whisper_model_size = orig_size # Asliga qaytaramiz
 
