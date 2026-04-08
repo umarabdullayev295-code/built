@@ -436,21 +436,8 @@ with st.sidebar:
             )
             st.info("💡 O'zbek tili uchun `medium` yoki `large-v2` tavsiya etiladi.")
 
-    # --- Timing sozlamalari ---
-    with st.expander("⏱️ Timing va Sinxron", expanded=False):
-        latency_val = st.slider(
-            "Subtitr siljishi (sekund):",
-            min_value=-2.0,
-            max_value=2.0,
-            value=0.0,
-            step=0.05,
-            help="Agar subtitr kechikayotgan bo'lsa manfiy (-), oldinlab ketayotgan bo'lsa musbat (+) qiymat bering."
-        )
-        st.session_state.latency_offset = latency_val
-
-
-
     st.markdown("---")
+
 
     # --- Media Yuklash ---
     st.markdown("### 📹 Media Kiritish")
@@ -854,8 +841,7 @@ else:
                             st.session_state.segments, 
                             start_time=start_time,
                             video_duration=st.session_state.get('video_duration', 0.0),
-                            debug=True,
-                            latency_offset=st.session_state.get("latency_offset", 0.0)
+                            debug=True
                         )
                     else:
                         st.audio(st.session_state.video_path, start_time=start_time)
@@ -867,8 +853,7 @@ else:
                             st.session_state.segments, 
                             start_time=start_time,
                             video_duration=st.session_state.get('video_duration', 0.0),
-                            debug=True,
-                            latency_offset=st.session_state.get("latency_offset", 0.0)
+                            debug=True
                         )
                     else:
                         st.video(st.session_state.video_path, start_time=start_time)
