@@ -45,6 +45,15 @@ class MuxlisaClient:
                 self.api_key = st.secrets.get("MUXLISA_API_KEY")
             except Exception:
                 pass
+        
+        # Aqlli tozalash: faqat chetdagi qo'shtirnoqlarni olib tashlaymiz
+        if self.api_key:
+            self.api_key = str(self.api_key).strip()
+            if len(self.api_key) >= 2:
+                if (self.api_key[0] == '"' and self.api_key[-1] == '"') or \
+                   (self.api_key[0] == "'" and self.api_key[-1] == "'"):
+                    self.api_key = self.api_key[1:-1]
+        
         self.available = bool(self.api_key)
 
     def is_available(self) -> bool:
@@ -98,7 +107,13 @@ class MuxlisaClient:
                                 if chunk_text:
                                     result_text = chunk_text
                             else:
-                                print(f"[Muxlisa AI] Chunk {chunk_idx} error: Status {response.status_code}, Body: {response.text}")
+                                print(f"[Muxlisa AI] Xato: Status {response.status_code}")
+                                if response.status_code == 401:
+                                    print("[Muxlisa AI] API Key noto'g'ri (Unauthorized).")
+                                elif response.status_code == 413:
+                                    print("[Muxlisa AI] Fayl hajmi juda katta.")
+                                else:
+                                    print(f"[Muxlisa AI] Response: {response.text}")
                 finally:
                     if os.path.exists(tmp_wav_path):
                         os.remove(tmp_wav_path)
