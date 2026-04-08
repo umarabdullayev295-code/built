@@ -127,55 +127,77 @@ class SpeechToText:
             if not muxlisa_words:
                 return results
 
-            # 2. Whisper (Tezkor lekin aniq) orqali vaqtlarni aniqlash
-            orig_size = self.whisper_model_size
-            # tez ishlashi uchun 'base' ni ishlatamiz
-            self.whisper_model_size = "base" 
+            # 2. Whisper orqali vaqtlarni aniqlash
+            # "base" model ba'zida 1 daqiqalik videoni 8 soniyada "tugadi" deb gallyutsinatsiya qilib yuboradi.
+            # Shu sababli foydalanuvchi qaysi modelni tanlagan bo'lsa, xuddi o'sha model ishlatiladi!
             whisper_results = self._transcribe_whisper(audio_path)
-            self.whisper_model_size = orig_size # Asliga qaytaramiz
 
-            # 3. Muxlisa so'zlarini Whisper segmentlariga professional INTERPOLATSIYA qilish
+            # 3. Muxlisa chunklari (esingizda bo'lsa API har 50s da bo'ladi) orqali yopishtiramiz
             aligned = []
-            m_count = len(muxlisa_words)
-            w_count = len(whisper_results)
             
-            if m_count == 0:
-                return []
-            if w_count == 0:
-                padding = 0.4
-                return [{"start": i*padding, "end": (i+1)*padding, "text": w} for i, w in enumerate(muxlisa_words)]
-
-            # 3. Indeks (Index-based) Proportional Sinxronizatsiya
-            # Muxlisa matnini Whisper so'zlariga proportsional vaqt indeksida bog'laymiz
-            # Bu algoritm so'zlashuv tezligi (pauzalar, tez gapirish)ni mukammal saqlab qoladi!
-            grouped = {}
-            for i, word in enumerate(muxlisa_words):
-                w_idx = int((i / m_count) * w_count)
-                w_idx = min(w_idx, w_count - 1)
-                
-                if w_idx not in grouped:
-                    grouped[w_idx] = []
-                grouped[w_idx].append(word)
-                
-            aligned = []
-            for w_idx in sorted(grouped.keys()):
-                words_list = grouped[w_idx]
-                w_start = whisper_results[w_idx]["start"]
-                w_end = whisper_results[w_idx]["end"]
-                
-                # Agar bir nechta so'z bitta Whisper o'rniga tushsa, vaqtni xolis bo'lamiz
-                c = len(words_list)
-                step = (w_end - w_start) / c if c > 0 else 0
-                
-                for idx, word in enumerate(words_list):
-                    t_start = w_start + idx * step
-                    t_end = w_start + (idx + 1) * step
+            for m_chunk in results:
+                if m_chunk.get("type") != "muxlisa_raw":
+                    continue
                     
-                    aligned.append({
-                        "start": round(t_start, 3),
-                        "end": round(t_end, 3),
-                        "text": word
-                    })
+                text = m_chunk.get("text", "")
+                words = [w.strip() for w in text.split() if w.strip()]
+                if not words:
+                    continue
+                    
+                # Muxlisa aniqlagan joriy blok yuki (masalan: 0s dan 50s gacha)
+                c_start = m_chunk["start"]
+                c_end = m_chunk["end"]
+                
+                # Shu oraliqdagi Whisper so'zlarini ajratib olamiz
+                w_sub = [w for w in whisper_results if w["start"] >= c_start - 1.0 and w["start"] <= c_end + 1.0]
+                
+                m_count = len(words)
+                w_count = len(w_sub)
+                
+                # Agar Whisper gallyutsinatsiya qilib hech narsa topmagan yoki erta to'xtab qolgan bo'lsa
+                if w_count == 0:
+                    # Xavfsizlik qatlami: oddiy vaqtga teng taqsimlash
+                    # Hamma so'zni birdaniga 8 sekuntga otib yubormasligi uchun!
+                    step = (c_end - c_start) / m_count if m_count > 0 else 0.4
+                    for i, w in enumerate(words):
+                        aligned.append({"start": round(c_start + i*step, 3), "end": round(c_start + (i+1)*step, 3), "text": w})
+                else:
+                    # Index proporsiyasi bilan Whisper VAD (jimjitlikka moslashib) ishlatamiz!
+                    
+                    # Agar Whisper faqat kichkina qismni (masalan 8 sekuntni) topgan-u, Muxlisa bloki 50sek bo'lsa:
+                    # Biz uni vaqt bo'yicha to'g'irlaymiz
+                    max_w_end = max(w["end"] for w in w_sub)
+                    # 10 soniyadan ortiq muddat yo'qolgan bo'lsa -> Whisper adashgan
+                    if (c_end - max_w_end) > 10.0 and m_count > w_count * 2:
+                         step = (c_end - c_start) / m_count
+                         for i, w in enumerate(words):
+                             aligned.append({"start": round(c_start + i*step, 3), "end": round(c_start + (i+1)*step, 3), "text": w})
+                         continue
+
+                    grouped = {}
+                    for i, w in enumerate(words):
+                        w_idx = int((i / m_count) * w_count)
+                        w_idx = min(w_idx, w_count - 1)
+                        if w_idx not in grouped:
+                            grouped[w_idx] = []
+                        grouped[w_idx].append(w)
+                        
+                    for w_idx in sorted(grouped.keys()):
+                        words_list = grouped[w_idx]
+                        w_start = w_sub[w_idx]["start"]
+                        w_end = w_sub[w_idx]["end"]
+                        
+                        c = len(words_list)
+                        step = (w_end - w_start) / c if c > 0 else 0
+                        
+                        for idx, word in enumerate(words_list):
+                            t_start = w_start + idx * step
+                            t_end = w_start + (idx + 1) * step
+                            aligned.append({
+                                "start": round(t_start, 3),
+                                "end": round(t_end, 3),
+                                "text": word
+                            })
                     
             return aligned
         except Exception as e:
