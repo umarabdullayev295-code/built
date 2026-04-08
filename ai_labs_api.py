@@ -62,24 +62,52 @@ class MuxlisaClient:
         headers = {"x-api-key": self.api_key}
         
         try:
-            # 1. API dan javob olish
-            with open(audio_path, "rb") as f:
-                files = {"audio": (os.path.basename(audio_path), f, "audio/wav")}
-                with httpx.Client(timeout=60.0) as client:
-                    response = client.post(MUXLISA_API_URL, headers=headers, files=files)
+            import soundfile as sf
+            import numpy as np
+            
+            data, samplerate = sf.read(audio_path)
+            total_duration = len(data) / samplerate
+            
+            chunk_duration = 50.0  # Safe chunk size (Muxlisa max is 60s)
+            
+            if total_duration <= 59.0:
+                chunks = [(data, 0.0)]
+            else:
+                samples_per_chunk = int(chunk_duration * samplerate)
+                chunks = []
+                for i in range(0, len(data), samples_per_chunk):
+                    chunks.append((data[i:i+samples_per_chunk], i / samplerate))
                     
-                    if response.status_code == 200:
-                        data = response.json()
-                        raw_text = data.get("text", "").strip()
-                        if not raw_text:
-                            return []
-
-                        # Router darajasida Word-level alignment qilish uchun 
-                        # butun matnni bitta obyektda qaytaramiz.
-                        return [{"start": 0.0, "end": 0.0, "text": raw_text, "type": "muxlisa_raw"}]
-                    else:
-                        print(f"[Muxlisa AI] Xato {response.status_code}: {response.text}")
-                        return []
+            full_text = ""
+            
+            for chunk_data, start_sec in chunks:
+                with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as tmp_wav:
+                    sf.write(tmp_wav.name, chunk_data, samplerate)
+                    tmp_wav_path = tmp_wav.name
+                    
+                try:
+                    with open(tmp_wav_path, "rb") as f:
+                        files = {"audio": (os.path.basename(tmp_wav_path), f, "audio/wav")}
+                        with httpx.Client(timeout=120.0) as client:
+                            response = client.post(MUXLISA_API_URL, headers=headers, files=files)
+                            
+                            if response.status_code == 200:
+                                result_data = response.json()
+                                chunk_text = result_data.get("text", "").strip()
+                                if chunk_text:
+                                    full_text += chunk_text + " "
+                            else:
+                                print(f"[Muxlisa AI] Chunk xato {response.status_code}: {response.text}")
+                finally:
+                    if os.path.exists(tmp_wav_path):
+                        os.remove(tmp_wav_path)
+            
+            full_text = full_text.strip()
+            if not full_text:
+                return []
+                
+            return [{"start": 0.0, "end": total_duration, "text": full_text, "type": "muxlisa_raw"}]
+            
         except Exception as e:
             print(f"[Muxlisa AI] Umumiy xato: {e}")
             return []
