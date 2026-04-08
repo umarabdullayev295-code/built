@@ -319,7 +319,7 @@ let maxTimestamp = 0;
 // Global sync adjustment
 const PERCEPTION_OFFSET = 0.0; 
 const MANUAL_LATENCY    = {latency_offset}; 
-const SYNC_DELAY        = -0.15 + MANUAL_LATENCY; 
+const SYNC_DELAY        = 0.0 + MANUAL_LATENCY; 
 
 words.forEach((w, idx) => {{
   const st = parseFloat(w.dataset.start);
@@ -357,8 +357,8 @@ function hideAll() {{
 
 function findActivePhrase(ct) {{
   for (const ph of phrases) {{
-    const ps = parseFloat(ph[0].dataset.start) + SYNC_DELAY - 0.2;
-    const pe = parseFloat(ph[ph.length-1].dataset.end) + SYNC_DELAY + 0.1;
+    const ps = parseFloat(ph[0].dataset.start) + SYNC_DELAY;
+    const pe = parseFloat(ph[ph.length-1].dataset.end) + SYNC_DELAY;
     if (ct >= ps && ct <= pe) return ph;
   }}
   return null;

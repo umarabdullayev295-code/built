@@ -154,6 +154,20 @@ class SpeechToText:
                     for i, w in enumerate(m_words):
                         aligned.append({"start": round(c_start + i*step, 3), "end": round(c_start + (i+1)*step, 3), "text": w})
                 else:
+                    # AGRESSIV SINXRONIZATSIYA:
+                    # Agar so'zlar soni juda yaqin bo'lsa, to'g'ridan-to'g'ri ZIP qilamiz.
+                    # Bu eng aniq timingni beradi (har bir so'z o'z o'rnida).
+                    if abs(len(m_words) - len(w_sub)) <= max(1, len(m_words) // 8):
+                        # Eng yaqin so'zlar soniga moslaymiz
+                        for i in range(min(len(m_words), len(w_sub))):
+                            aligned.append({
+                                "start": w_sub[i]["start"],
+                                "end": w_sub[i]["end"],
+                                "text": m_words[i]
+                            })
+                        continue
+
+                    # Agar farq katta bo'lsa, SequenceMatcher ishlatamiz
                     w_words = [w["text"].strip().lower() for w in w_sub]
                     m_words_lower = [w.lower() for w in m_words]
                     
