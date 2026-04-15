@@ -29,5 +29,5 @@ streamlit run app.py
 
 ## ⚙️ Sozlamalar
 `.env` faylida quyidagi kalitlarni ko'rsatishingiz mumkin:
-- `ELEVENLABS_API_KEY`: ElevenLabs API kaliti (ixtiyoriy).
-- `TELEGRAM_BOT_TOKEN`: Telegram bot tokeni (ixtiyoriy).
+- `MUXLISA_AI_API_KEY`: ElevenLabs API kaliti (ixtiyoriy).
+
