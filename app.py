@@ -24,6 +24,57 @@ SEEK_PREROLL_SEC = 0.35
 # Load environment variables
 load_dotenv()
 
+_TEMP_FILE_PREFIXES = ("media_ai_", "audio_")
+_TEMP_FILE_EXTS = (".wav", ".mp3", ".m4a", ".ogg", ".flac", ".mp4", ".mov", ".avi", ".mkv", ".webm")
+_HOUSEKEEPING_INTERVAL_SEC = 45
+_STALE_TEMP_AGE_SEC = 30 * 60
+
+
+def _safe_unlink(path: str) -> None:
+    try:
+        if path and os.path.exists(path):
+            os.remove(path)
+    except Exception:
+        pass
+
+
+def _run_housekeeping(force: bool = False) -> None:
+    """
+    Yengil avtomatik servis:
+    - eski temp fayllarni o'chirish
+    - keraksiz GC ishga tushirish
+    """
+    now = time.time()
+    last_ts = float(st.session_state.get("_last_housekeeping_ts", 0.0) or 0.0)
+    if not force and (now - last_ts) < _HOUSEKEEPING_INTERVAL_SEC:
+        return
+
+    temp_dir = tempfile.gettempdir()
+    cutoff = now - _STALE_TEMP_AGE_SEC
+    removed = 0
+    try:
+        for name in os.listdir(temp_dir):
+            if not name.startswith(_TEMP_FILE_PREFIXES):
+                continue
+            if not name.lower().endswith(_TEMP_FILE_EXTS):
+                continue
+            fpath = os.path.join(temp_dir, name)
+            try:
+                if os.path.isfile(fpath) and os.path.getmtime(fpath) < cutoff:
+                    os.remove(fpath)
+                    removed += 1
+            except Exception:
+                continue
+    except Exception:
+        pass
+
+    # Faqat bo'sh holatda (processing emas) GC chaqiramiz.
+    if not st.session_state.get("processing", False):
+        gc.collect()
+
+    st.session_state._last_housekeeping_ts = now
+    st.session_state._last_housekeeping_removed = removed
+
 # --- Ilovani Sozlash ---
 st.set_page_config(
     page_title="Asosiy qidiruv · Video AI",
@@ -35,6 +86,7 @@ st.set_page_config(
 init_state()
 apply_theme_from_query_params()
 inject_global_styles()
+_run_housekeeping()
 
 # ─────────────────────────────────────────────
 # (CSS ui_styles.py da — universal + responsive)
@@ -61,6 +113,7 @@ render_sidebar()
 if st.session_state.processing and st.session_state.video_path:
     video_path = st.session_state.video_path
     processing_completed = False
+    audio_path = None
 
     try:
         with st.spinner("⏳ Qayta ishlanmoqda, biroz kuting..."):
@@ -119,6 +172,7 @@ if st.session_state.processing and st.session_state.video_path:
             # Temp audio faylni o'chirish
             from utils import cleanup_file
             cleanup_file(audio_path)
+            audio_path = None
 
             progress_bar.progress(70)
 
@@ -146,9 +200,14 @@ if st.session_state.processing and st.session_state.video_path:
             gc.collect()
             time.sleep(1)
             processing_completed = True
+    except Exception as e:
+        st.session_state.index_built = False
+        st.error(f"❌ Qayta ishlashda xato yuz berdi: {e}")
     finally:
         # Theme almashishi kabi rerun holatlarida ham jarayon flag'i noto'g'ri qolib ketmasin.
         st.session_state.processing = False
+        _safe_unlink(audio_path)
+        gc.collect()
 
     if processing_completed:
         st.rerun()
