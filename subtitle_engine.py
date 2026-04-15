@@ -20,7 +20,7 @@ from typing import List, Dict, Optional
 # ─────────────────────────────────────────────────────────────────────────────
 
 @st.cache_data(show_spinner=False)
-def get_video_b64(video_path: str, cache_key: str = "") -> str:
+def get_video_b64(video_path: str) -> str:
     """Video faylni base64 ko'rinishida o'qiydi va keshlaydi."""
     try:
         with open(video_path, "rb") as f:
@@ -59,23 +59,14 @@ def scale_timestamps(
     if not segments or video_duration <= 0:
         return segments
 
-    # Muxlisa+audio alignment orqali "lock" qilingan timingga scale tegmasin.
-    if segments and segments[0].get("__timing_locked__", False):
-        return segments
-
-    # Oldin scale qilingan bo'lsa, qayta scale qilmaymiz (double-scalingdan himoya)
-    if segments and segments[0].get("__scaled__", False):
-        return segments
-
     # Barcha so'zlardan maksimal vaqtni aniqlaymiz
     max_timestamp = max(s.get("end", 0) for s in segments)
 
     # Video va subtitr uzunliklari o'rtasidagi farq nisbati
     diff_ratio = abs(video_duration - max_timestamp) / video_duration
     
-    # Subtitr va video davomiyligi sezilarli farq qilsa scale qilamiz.
-    # Juda kichik farqni (2% gacha) o'zgartirmaymiz.
-    if max_timestamp > 0 and 0.02 < diff_ratio < 0.35:
+    # Subtitrlar va video orasidagi farq 15% gacha bo'lsa scale qilamiz.
+    if max_timestamp > 0 and 0.001 < diff_ratio < 0.15:
         scale = video_duration / max_timestamp
 
         if debug:
@@ -90,8 +81,6 @@ def scale_timestamps(
                 **s,
                 "start": round(s.get("start", 0) * scale, 3),
                 "end": round(s.get("end", 0) * scale, 3),
-                "__scaled__": True,
-                "__scale_factor__": round(scale, 6),
             })
 
         if debug:
@@ -137,18 +126,16 @@ def render_youtube_player(
         st.warning("⚠️ Subtitlelar uchun segment ma'lumotlari topilmadi.")
         return
 
-    # Qidiruvdan bosilganda aynan topilgan vaqtdan boshlaymiz.
+    # ── Pre-roll buffer (so'z boshlanishidan biroz oldin video starts) ──
     if start_time > 0:
-        start_time = max(0.0, float(start_time))
+        start_time = max(0.0, start_time - 0.3)
 
     # ── Timestamp auto-scale ──
     if video_duration > 0:
         segments = scale_timestamps(segments, video_duration, debug=debug)
 
-    # ── Base64 encoding (cache bust: path bir xil bo'lsa ham yangi kontent yangilansin) ──
-    stat = os.stat(video_path)
-    cache_key = f"{video_path}:{stat.st_mtime_ns}:{stat.st_size}"
-    video_b64 = get_video_b64(video_path, cache_key=cache_key)
+    # ── Base64 encoding ──
+    video_b64 = get_video_b64(video_path)
     if not video_b64:
         st.error("❌ Video yuklab bo'lmadi.")
         return
@@ -216,7 +203,7 @@ def render_youtube_player(
   /* ── Subtitle overlay ── */
   .sub-overlay {{
     position: absolute;
-    bottom: 12%;
+    bottom: 14%;
     left: 0; right: 0;
     display: flex;
     justify-content: center;
@@ -227,10 +214,10 @@ def render_youtube_player(
   }}
 
   .caption-box {{
-    background: rgba(0, 0, 0, 0.24);
-    border: 1px solid rgba(255,255,255,0.08);
-    border-radius: 12px;
-    padding: 5px 10px;
+    background: rgba(0,0,0,0.7);
+    border: 1px solid rgba(255,255,255,0.15);
+    border-radius: 18px;
+    padding: 14px 28px;
     will-change: transform, opacity;
     max-width: 90%;
     display: flex;
@@ -253,13 +240,11 @@ def render_youtube_player(
   /* ── Individual word chip ── */
   .word {{
     display: none;
-    font-size: clamp(1.25rem, 3.8vw, 2rem);
+    font-size: clamp(1.8rem, 6vw, 3.8rem); /* Make it bigger for single-word focus */
     font-weight: 900;
-    color: rgba(255,255,255,0.96);
-    letter-spacing: 0;
-    text-shadow:
-      0 1px 2px rgba(0,0,0,0.95),
-      0 0 1px rgba(0,0,0,0.9);
+    color: #ffffff;
+    letter-spacing: -0.01em;
+    text-shadow: 2px 2px 10px rgba(0,0,0,1);
     transition:
       color       0.05s ease-out,
       transform   0.07s cubic-bezier(0, 0, 0.2, 1);
@@ -267,11 +252,9 @@ def render_youtube_player(
 
   .word.active {{
     display: inline-block;
-    color: #ffffff;
-    transform: scale(1.03);
-    text-shadow:
-      0 1px 2px rgba(0,0,0,0.98),
-      0 0 2px rgba(0,0,0,0.92);
+    color: #ffcc00; 
+    transform: scale(1.12) translateY(-2px);
+    text-shadow: 0 0 8px rgba(255, 204, 0, 0.4);
   }}
 
   /* ── Mode switcher (top-right, appears on hover) ── */
@@ -293,8 +276,8 @@ def render_youtube_player(
   .m-btn.on {{ background: #FFD700; color: #111; border-color: #FFD700; }}
 
   @media (max-width: 600px) {{
-    .word {{ font-size: 1.08rem; }}
-    .caption-box {{ padding: 4px 8px; gap: 2px 5px; }}
+    .word {{ font-size: 1.3rem; }}
+    .caption-box {{ padding: 10px 16px; gap: 3px 7px; }}
     .sub-overlay {{ bottom: 10%; }}
   }}
 </style>
@@ -329,15 +312,13 @@ const vid   = document.getElementById('vid');
 const cbox  = document.getElementById('cbox');
 const words = Array.from(document.querySelectorAll('.word'));
 let mode    = 1;   // Forced to Word-by-word mode
-const starts = words.map(w => parseFloat(w.dataset.start));
-const ends = words.map(w => parseFloat(w.dataset.end));
 
 /* ── Pre-compute phrase groups (burst gap > 0.9s → new phrase) ── */
 const phrases = [];
 let cur = [];
 let maxTimestamp = 0;
 // Global sync adjustment
-const PERCEPTION_OFFSET = 0.015; 
+const PERCEPTION_OFFSET = 0.045; 
 const MANUAL_LATENCY    = {latency_offset}; 
 const SYNC_DELAY        = 0.0 + MANUAL_LATENCY; 
 
@@ -375,48 +356,55 @@ function hideAll() {{
   }});
 }}
 
-function findActiveGlobalIdx(ct) {{
-  /* Strict timeline: word faqat o'z intervalida ko'rinadi */
-  const t = ct - SYNC_DELAY;
-  if (!starts.length) return -1;
-
-  // Binary search: last index with start <= t
-  let lo = 0;
-  let hi = starts.length - 1;
-  let idx = -1;
-  while (lo <= hi) {{
-    const mid = (lo + hi) >> 1;
-    if (starts[mid] <= t) {{
-      idx = mid;
-      lo = mid + 1;
-    }} else {{
-      hi = mid - 1;
-    }}
+function findActivePhrase(ct) {{
+  for (const ph of phrases) {{
+    const ps = parseFloat(ph[0].dataset.start) + SYNC_DELAY;
+    const pe = parseFloat(ph[ph.length-1].dataset.end) + SYNC_DELAY;
+    if (ct >= ps && ct <= pe) return ph;
   }}
-  if (idx < 0) return -1;
+  return null;
+}}
 
-  // Minimal grace: erta/kechikishni kamaytirish uchun juda kichik buffer
-  const ws = starts[idx] - PERCEPTION_OFFSET;
-  const we = ends[idx] + 0.005;
-  if (t >= ws && t <= we) return idx;
-  return -1;
+function findActiveIdx(phrase, ct) {{
+  /* Returns index of the currently-spoken word within phrase (-1 if none) */
+  for (let i = 0; i < phrase.length; i++) {{
+    const rawSt = parseFloat(phrase[i].dataset.start);
+    const rawEnd = parseFloat(phrase[i].dataset.end);
+    const ws = rawSt + SYNC_DELAY - PERCEPTION_OFFSET;
+    const we = rawEnd + SYNC_DELAY + 0.08; 
+    if (ct >= ws && ct <= we) return i;
+  }}
+  /* If we're inside the phrase window but between two words, use last spoken */
+  const ct2 = ct;
+  let last = -1;
+  for (let i = 0; i < phrase.length; i++) {{
+    if (ct2 >= (parseFloat(phrase[i].dataset.start) - PERCEPTION_OFFSET)) last = i;
+    else break;
+  }}
+  return last;
 }}
 
 /* ── Main render loop ── */
 function render() {{
   const ct = vid.currentTime;
-  const activeIdx = findActiveGlobalIdx(ct);
-  hideAll();
-  if (activeIdx < 0) {{
+  const phrase = findActivePhrase(ct);
+
+  if (!phrase) {{
+    hideAll();
     cbox.classList.remove('show');
     requestAnimationFrame(render);
     return;
   }}
+
+  const activeIdx = findActiveIdx(phrase, ct);
+  hideAll();
   cbox.classList.add('show');
 
   /* Only 1-Word display */
-  words[activeIdx].style.display = 'inline-block';
-  words[activeIdx].classList.add('active');
+  if (activeIdx >= 0) {{
+    phrase[activeIdx].style.display = 'inline-block';
+    phrase[activeIdx].classList.add('active');
+  }}
 
   requestAnimationFrame(render);
 }}
@@ -433,36 +421,13 @@ words.forEach(w => {{
 }});
 
 /* ── Autoplay / seek to start_time ── */
-let hasInitialSeek = false;
 function seekToStart() {{
-  if (hasInitialSeek) return;
   if ({start_time} > 0) {{
-    const target = {start_time};
-    let attempts = 0;
-    const maxAttempts = 12;
-
-    const applySeek = () => {{
-      attempts += 1;
-      try {{
-        vid.currentTime = target;
-      }} catch (e) {{}}
-
-      // 40ms aniqlik yetarli, aks holda yana urinib ko'ramiz
-      if (Math.abs((vid.currentTime || 0) - target) <= 0.04 || attempts >= maxAttempts) {{
-        hasInitialSeek = true;
-        vid.play().catch(() => {{}});
-        return;
-      }}
-      setTimeout(applySeek, 120);
-    }};
-
-    applySeek();
-  }} else {{
-    hasInitialSeek = true;
+    vid.currentTime = {start_time};
+    vid.play().catch(() => {{}});
   }}
 }}
-vid.addEventListener('loadedmetadata', seekToStart, {{ once: true }});
-vid.addEventListener('canplay', seekToStart, {{ once: true }});
+vid.addEventListener('loadedmetadata', seekToStart);
 if (vid.readyState >= 1) seekToStart();
 
 /* ── Start render loop ── */
