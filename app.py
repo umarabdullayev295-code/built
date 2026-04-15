@@ -59,15 +59,16 @@ render_sidebar()
 # VIDEO QAYTA ISHLASH
 # ─────────────────────────────────────────────
 if st.session_state.processing and st.session_state.video_path:
-    st.session_state.processing = False
     video_path = st.session_state.video_path
+    processing_completed = False
 
-    with st.spinner("⏳ Qayta ishlanmoqda, biroz kuting..."):
-        progress_container = st.container()
-        with progress_container:
-            st.markdown("### ⚙️ Qayta Ishlash Bosqichlari")
-            progress_bar = st.progress(0)
-            status_text = st.empty()
+    try:
+        with st.spinner("⏳ Qayta ishlanmoqda, biroz kuting..."):
+            progress_container = st.container()
+            with progress_container:
+                st.markdown("### ⚙️ Qayta Ishlash Bosqichlari")
+                progress_bar = st.progress(0)
+                status_text = st.empty()
 
             # ── Qadam 1: Video ma'lumotlari ──
             status_text.markdown("**1/4** 📋 Video ma'lumotlari o'qilmoqda...")
@@ -141,11 +142,16 @@ if st.session_state.processing and st.session_state.video_path:
             status_text.markdown(f"✅ **Tayyorlandi!** {count} segment indekslandi.")
             st.toast(f"✅ {count} ta segment tahlil qilindi!", icon="🚀")
             
-            # Tugatgandan so'ng xotirani tozalash
-            gc.collect()
-            time.sleep(1)
+                # Tugatgandan so'ng xotirani tozalash
+                gc.collect()
+                time.sleep(1)
+                processing_completed = True
+    finally:
+        # Theme almashishi kabi rerun holatlarida ham jarayon flag'i noto'g'ri qolib ketmasin.
+        st.session_state.processing = False
 
-    st.rerun()
+    if processing_completed:
+        st.rerun()
 
 # ─────────────────────────────────────────────
 # ASOSIY QISM: Qidiruv va Natijalar
