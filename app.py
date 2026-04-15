@@ -142,10 +142,10 @@ if st.session_state.processing and st.session_state.video_path:
             status_text.markdown(f"✅ **Tayyorlandi!** {count} segment indekslandi.")
             st.toast(f"✅ {count} ta segment tahlil qilindi!", icon="🚀")
             
-                # Tugatgandan so'ng xotirani tozalash
-                gc.collect()
-                time.sleep(1)
-                processing_completed = True
+            # Tugatgandan so'ng xotirani tozalash
+            gc.collect()
+            time.sleep(1)
+            processing_completed = True
     finally:
         # Theme almashishi kabi rerun holatlarida ham jarayon flag'i noto'g'ri qolib ketmasin.
         st.session_state.processing = False
