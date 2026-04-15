@@ -1,5 +1,6 @@
 streamlit>=1.38.0
 moviepy
+imageio-ffmpeg>=0.4.9
 faster-whisper
 httpx
 python-dotenv
