@@ -77,11 +77,13 @@ class MuxlisaClient:
             data, samplerate = sf.read(audio_path)
             total_duration = len(data) / samplerate
             
-            chunk_duration = 50.0  # Safe chunk size (Muxlisa max is 60s)
-            
-            if total_duration <= 59.0:
+            # Muxlisa rejimida 1..60s oralig'ini barqaror qilish:
+            # bitta butun chunk qaytaramiz (timeline uzilmaydi).
+            if total_duration <= 60.0:
                 chunks = [(data, 0.0)]
             else:
+                # 60s dan katta fayllar uchun adaptiv chunk (10..20s diapazon).
+                chunk_duration = float(min(20, max(10, int(total_duration / 8))))
                 samples_per_chunk = int(chunk_duration * samplerate)
                 chunks = []
                 for i in range(0, len(data), samples_per_chunk):
@@ -127,7 +129,7 @@ class MuxlisaClient:
                 }
 
             results_dict = {}
-            with concurrent.futures.ThreadPoolExecutor(max_workers=5) as executor:
+            with concurrent.futures.ThreadPoolExecutor(max_workers=4) as executor:
                 futures = []
                 for idx, (chunk_data, start_sec) in enumerate(chunks):
                     futures.append(executor.submit(process_chunk, idx, chunk_data, start_sec))
