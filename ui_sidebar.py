@@ -134,18 +134,6 @@ def render_sidebar() -> None:
 
                 gc.collect()
 
-                # Faqat UzbekPro rejimida 60s limitni tekshiramiz.
-                if "Muxlisa" in st.session_state.get("engine_choice", ""):
-                    try:
-                        from video_processor import get_video_info
-                        info = get_video_info(temp_video_path)
-                        dur = float(info.get("duration_sec", 0) or 0)
-                        if dur > 60.0:
-                            st.error("❌ UzbekPro rejimida media davomiyligi 60 sekunddan oshmasligi kerak.")
-                            return
-                    except Exception:
-                        st.warning("⚠️ Davomiylikni tekshirib bo'lmadi. UzbekPro uchun 60s limitni hisobga oling.")
-
                 st.session_state.video_path = temp_video_path
                 st.session_state.video_name = file_name
                 st.session_state.play_timestamp = 0
