@@ -10,6 +10,7 @@ import tempfile
 import time
 import random
 from typing import List, Dict, Optional
+from dotenv import load_dotenv
 try:
     # from elevenlabs.client import ElevenLabs
     pass
@@ -38,13 +39,18 @@ class MuxlisaClient:
     """
 
     def __init__(self, api_key: str = None):
-        self.api_key = api_key or os.environ.get("MUXLISA_API_KEY")
+        # Streamlit Cloud uchun asosiy manba: st.secrets.
+        # Lokal fallback: explicit api_key -> .env/os.environ.
+        self.api_key = api_key
         if not self.api_key:
             try:
                 import streamlit as st
                 self.api_key = st.secrets.get("MUXLISA_API_KEY")
             except Exception:
                 pass
+        if not self.api_key:
+            load_dotenv(override=True)
+            self.api_key = os.environ.get("MUXLISA_API_KEY")
         
         # Aqlli tozalash: faqat chetdagi qo'shtirnoqlarni olib tashlaymiz
         if self.api_key:
