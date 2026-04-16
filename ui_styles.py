@@ -723,7 +723,12 @@ def inject_global_styles():
 }}
 @media (max-width: 640px) {{
     .main-header {{ padding: 1.25rem 0.5rem !important; margin-bottom: 1rem !important; border-radius: 18px !important; }}
-    .main-header h1 {{ font-size: 1.75rem !important; letter-spacing: -0.5px !important; animation: none !important; }}
+    .main-header h1 {{
+        font-size: 1.75rem !important;
+        letter-spacing: -0.5px !important;
+        background-size: 220% auto !important;
+        animation: shine 5.5s linear infinite !important;
+    }}
     .main-header p {{ font-size: 0.95rem !important; }}
     .info-banner {{ padding: 1.25rem 1rem !important; margin: 1rem 0 !important; border-radius: 18px !important; }}
     .info-banner h3 {{ font-size: 1.25rem !important; }}
