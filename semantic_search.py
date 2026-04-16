@@ -48,6 +48,9 @@ class SemanticSearch:
         self.index = None
         self.segments: List[Dict] = []
         self.dimension: int = 0
+        self._max_segments: int = 3500
+        self._max_text_len: int = 220
+        self._loc_by_key: Dict[Tuple[float, float], int] = {}
 
     def _load_encoder(self):
         """Encoder modelini lazy loading va st.cache_resource bilan yuklaydi."""
@@ -71,12 +74,28 @@ class SemanticSearch:
         if not segments:
             return 0
 
-        # Bo'sh matnlarni filtrlash
-        valid_segments = [s for s in segments if s.get("text", "").strip()]
+        # Bo'sh matnlarni filtrlash + xotira uchun yengillashtirish
+        valid_segments = []
+        for s in segments:
+            text = str(s.get("text", "")).strip()
+            if not text:
+                continue
+            if len(text) > self._max_text_len:
+                text = text[: self._max_text_len]
+            valid_segments.append({**s, "text": text})
+
+        # Juda uzun transkriptlarda xotira uchun eng so'nggi segmentlarni saqlaymiz.
+        if len(valid_segments) > self._max_segments:
+            valid_segments = valid_segments[-self._max_segments :]
+
         if not valid_segments:
             return 0
 
         self.segments = valid_segments
+        self._loc_by_key = {
+            (float(seg.get("start", 0.0)), float(seg.get("end", 0.0))): i
+            for i, seg in enumerate(valid_segments)
+        }
         texts = [seg["text"] for seg in valid_segments]
 
         encoder = self._load_encoder()
@@ -155,10 +174,9 @@ class SemanticSearch:
 
         for res in results:
             # Javob segmentining indeksini topish
-            idx = self.segments.index(
-                next(s for s in self.segments
-                     if s["start"] == res["start"] and s["end"] == res["end"])
-            )
+            idx = self._loc_by_key.get((float(res["start"]), float(res["end"])))
+            if idx is None:
+                continue
 
             # Qo'shni segmentlarni birlashtirish
             start_idx = max(0, idx - context_window)
@@ -194,4 +212,5 @@ class SemanticSearch:
         self.index = None
         self.segments = []
         self.dimension = 0
+        self._loc_by_key = {}
         print("[SemanticSearch] Indeks tozalandi.")

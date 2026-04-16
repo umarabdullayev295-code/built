@@ -19,6 +19,44 @@ from ui_sidebar import render_sidebar
 # Load environment variables
 load_dotenv()
 
+_HOUSEKEEPING_INTERVAL_SEC = 60
+_STALE_TEMP_AGE_SEC = 20 * 60
+_TEMP_PREFIXES = ("media_ai_", "audio_", "tmp_tts")
+_TEMP_EXTS = (".wav", ".mp3", ".m4a", ".ogg", ".flac", ".mp4", ".mov", ".avi", ".mkv", ".webm")
+
+
+def _safe_unlink(path: str | None) -> None:
+    try:
+        if path and os.path.exists(path):
+            os.remove(path)
+    except Exception:
+        pass
+
+
+def _run_housekeeping(force: bool = False) -> None:
+    now = time.time()
+    last_ts = float(st.session_state.get("_last_housekeeping_ts", 0.0) or 0.0)
+    if not force and (now - last_ts) < _HOUSEKEEPING_INTERVAL_SEC:
+        return
+    tdir = tempfile.gettempdir()
+    cutoff = now - _STALE_TEMP_AGE_SEC
+    try:
+        for name in os.listdir(tdir):
+            if not name.startswith(_TEMP_PREFIXES):
+                continue
+            if not name.lower().endswith(_TEMP_EXTS):
+                continue
+            p = os.path.join(tdir, name)
+            try:
+                if os.path.isfile(p) and os.path.getmtime(p) < cutoff:
+                    os.remove(p)
+            except Exception:
+                continue
+    except Exception:
+        pass
+    gc.collect()
+    st.session_state._last_housekeeping_ts = now
+
 # --- Ilovani Sozlash ---
 st.set_page_config(
     page_title="🎬 Video AI Search",
@@ -54,6 +92,7 @@ def init_state():
 
 init_state()
 apply_theme_from_query_params()
+_run_housekeeping()
 
 # ─────────────────────────────────────────────
 # CUSTOM CSS — Premium Dynamic UI
@@ -413,89 +452,94 @@ render_sidebar()
 # VIDEO QAYTA ISHLASH
 # ─────────────────────────────────────────────
 if st.session_state.processing and st.session_state.video_path:
-    st.session_state.processing = False
     video_path = st.session_state.video_path
+    audio_path = None
+    processing_ok = False
 
     progress_container = st.container()
-    with progress_container:
-        st.markdown("### ⚙️ Qayta Ishlash Bosqichlari")
-        progress_bar = st.progress(0)
-        status_text = st.empty()
+    try:
+        with progress_container:
+            st.markdown("### ⚙️ Qayta Ishlash Bosqichlari")
+            progress_bar = st.progress(0)
+            status_text = st.empty()
 
-        # ── Qadam 1: Video ma'lumotlari ──
-        status_text.markdown("**1/4** 📋 Video ma'lumotlari o'qilmoqda...")
-        progress_bar.progress(10)
-        from video_processor import get_video_info
-        info = get_video_info(video_path)
-        st.session_state.video_duration = info.get("duration_sec", 0)
-        time.sleep(0.3)
+            # ── Qadam 1: Video ma'lumotlari ──
+            status_text.markdown("**1/4** 📋 Video ma'lumotlari o'qilmoqda...")
+            progress_bar.progress(10)
+            from video_processor import get_video_info
 
-        # ── Qadam 2: Audio ajratish ──
-        status_text.markdown("**2/4** 🔊 Audio ajratilmoqda (Tezkor rejim)...")
-        progress_bar.progress(25)
-        from video_processor import extract_audio
-        audio_path = extract_audio(video_path, output_ext="wav")
+            info = get_video_info(video_path)
+            st.session_state.video_duration = info.get("duration_sec", 0)
+            time.sleep(0.2)
 
-        if not audio_path:
-            st.error("❌ Audio ajratib bo'lmadi. Video fayldа audio trek mavjudligini tekshiring.")
-            st.stop()
+            # ── Qadam 2: Audio ajratish ──
+            status_text.markdown("**2/4** 🔊 Audio ajratilmoqda (Tezkor rejim)...")
+            progress_bar.progress(25)
+            from video_processor import extract_audio
 
-        progress_bar.progress(40)
+            audio_path = extract_audio(video_path, output_ext="wav")
+            if not audio_path:
+                st.session_state.index_built = False
+                st.error("❌ Audio ajratib bo'lmadi. Video faylda audio trek mavjudligini tekshiring.")
+                st.stop()
 
-        # ── Qadam 3: Nutqni matnga o'tkazish ──
-        status_text.markdown("**3/4** 🧠 Nutq matnga o'tkazilmoqda ...")
-        progress_bar.progress(45)
+            progress_bar.progress(40)
 
-        from speech_to_text import SpeechToText
-        engine_choice = st.session_state.get("engine_choice", "Whisper (Asosiy)")
-        stt = SpeechToText(
-            whisper_model_size=st.session_state.get("whisper_model", "base"),
-            language=st.session_state.target_lang,
-            use_api=("Muxlisa AI" in engine_choice),
-            engine_name=engine_choice
-        )
-        st.session_state.stt_engine = stt
-        st.session_state.engine_name = stt.get_engine_name()
-        segments = stt.transcribe(audio_path)
-        
-        # Qat'iy global autoscale: Barcha modullar (SRT, semantic_search, player) uchun 
-        # faqat moslashtirilgan mukammal time o'zlashtiriladi!
-        if segments and st.session_state.video_duration > 0:
-            from subtitle_engine import scale_timestamps
-            segments = scale_timestamps(segments, st.session_state.video_duration, debug=False)
-            
-        st.session_state.segments = segments
-        # Temp audio faylni o'chirish
-        from utils import cleanup_file
-        cleanup_file(audio_path)
+            # ── Qadam 3: Nutqni matnga o'tkazish ──
+            status_text.markdown("**3/4** 🧠 Nutq matnga o'tkazilmoqda ...")
+            progress_bar.progress(45)
 
-        progress_bar.progress(70)
+            from speech_to_text import SpeechToText
 
-        if not segments:
-            st.warning("⚠️ Audio transkripsiya natijalari bo'sh. Boshqa model yoki fayl sinab ko'ring.")
-            st.stop()
-        
-        st.toast("✅ Transkripsiya muvaffaqiyatli yakunlandi!", icon="🎯")
+            engine_choice = st.session_state.get("engine_choice", "Whisper (Asosiy)")
+            stt = SpeechToText(
+                whisper_model_size=st.session_state.get("whisper_model", "base"),
+                language=st.session_state.target_lang,
+                use_api=("Muxlisa AI" in engine_choice),
+                engine_name=engine_choice,
+            )
+            st.session_state.stt_engine = stt
+            st.session_state.engine_name = stt.get_engine_name()
+            segments = stt.transcribe(audio_path)
 
-        # ── Qadam 4: Semantik indeks yaratish ──
-        status_text.markdown(f"**4/4** 🔍 Semantik qidiruv indeksi yaratilmoqda ({len(segments)} segment)...")
-        progress_bar.progress(80)
+            if segments and st.session_state.video_duration > 0:
+                from subtitle_engine import scale_timestamps
 
-        from semantic_search import SemanticSearch
-        search_engine = SemanticSearch()
-        count = search_engine.add_transcripts(segments)
-        st.session_state.search_engine = search_engine
-        st.session_state.index_built = True
+                segments = scale_timestamps(segments, st.session_state.video_duration, debug=False)
 
-        progress_bar.progress(100)
-        status_text.markdown(f"✅ **Tayyorlandi!** {count} segment indekslandi.")
-        st.toast(f"✅ {count} ta segment tahlil qilindi!", icon="🚀")
-        
-        # Tugatgandan so'ng xotirani tozalash
-        gc.collect()
-        time.sleep(1)
+            st.session_state.segments = segments
+            progress_bar.progress(70)
 
-    st.rerun()
+            if not segments:
+                st.session_state.index_built = False
+                st.warning("⚠️ Audio transkripsiya natijalari bo'sh. Boshqa model yoki fayl sinab ko'ring.")
+                st.stop()
+
+            st.toast("✅ Transkripsiya muvaffaqiyatli yakunlandi!", icon="🎯")
+
+            # ── Qadam 4: Semantik indeks yaratish ──
+            status_text.markdown(f"**4/4** 🔍 Semantik qidiruv indeksi yaratilmoqda ({len(segments)} segment)...")
+            progress_bar.progress(80)
+
+            from semantic_search import SemanticSearch
+
+            search_engine = SemanticSearch()
+            count = search_engine.add_transcripts(segments)
+            st.session_state.search_engine = search_engine
+            st.session_state.index_built = True
+
+            progress_bar.progress(100)
+            status_text.markdown(f"✅ **Tayyorlandi!** {count} segment indekslandi.")
+            st.toast(f"✅ {count} ta segment tahlil qilindi!", icon="🚀")
+            processing_ok = True
+    finally:
+        st.session_state.processing = False
+        _safe_unlink(audio_path)
+        _run_housekeeping(force=True)
+
+    if processing_ok:
+        time.sleep(0.4)
+        st.rerun()
 
 # ─────────────────────────────────────────────
 # ASOSIY QISM: Qidiruv va Natijalar
@@ -704,7 +748,7 @@ else:
                             st.session_state.segments, 
                             start_time=start_time,
                             video_duration=st.session_state.get('video_duration', 0.0),
-                            debug=True
+                            debug=False
                         )
                     else:
                         st.audio(st.session_state.video_path, start_time=start_time)
@@ -716,7 +760,7 @@ else:
                             st.session_state.segments, 
                             start_time=start_time,
                             video_duration=st.session_state.get('video_duration', 0.0),
-                            debug=True
+                            debug=False
                         )
                     else:
                         st.video(st.session_state.video_path, start_time=start_time)

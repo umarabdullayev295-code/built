@@ -121,9 +121,9 @@ def render_sidebar() -> None:
                 st.session_state.video_duration = 0
                 st.session_state.index_built = False
 
-                # Model/embedding cache'lari RAM'ni ushlab qolmasligi uchun
+                # Tezlik uchun model cache'ni saqlab qolamiz.
+                # Faqat data cache tozalanadi (resource cache manual tugmada qoladi).
                 st.cache_data.clear()
-                st.cache_resource.clear()
 
                 try:
                     import torch
