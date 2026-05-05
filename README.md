@@ -29,5 +29,6 @@ streamlit run app.py
 
 ## ⚙️ Sozlamalar
 `.env` faylida quyidagi kalitlarni ko'rsatishingiz mumkin:
-- `MUXLISA_AI_API_KEY`: ElevenLabs API kaliti (ixtiyoriy).
+- `MUXLISA_API_KEY`: Muxlisa STT uchun API kaliti (ixtiyoriy; `MUXLISA_AI_API_KEY` ham tan olinadi).
+- `MUXLISA_WHISPER_ALIGN` (`1` / `true`): Muxlisa matniga so'z vaqtini Whisper ritmi bilan bog'lash — odatda **yoqilmaydi** (tezroq, matn to'liq Muxlisa'dan).
 

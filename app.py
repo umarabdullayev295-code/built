@@ -16,8 +16,10 @@ from dotenv import load_dotenv
 from ui_styles import apply_theme_from_query_params, inject_global_styles
 from ui_sidebar import render_sidebar
 
-# Load environment variables
-load_dotenv()
+# .env har doim app.py bilan bir papkadan (cwd ga bog'lanmasin); lokal MUXLISA kaliti uchun override.
+_APP_DIR = Path(__file__).resolve().parent
+load_dotenv(_APP_DIR / ".env", override=True)
+SEEK_PREROLL_SEC = 0.35
 
 _HOUSEKEEPING_INTERVAL_SEC = 60
 _STALE_TEMP_AGE_SEC = 20 * 60
@@ -78,6 +80,7 @@ def init_state():
         "index_built": False,
         "processing": False,
         "play_timestamp": 0,
+        "seek_id": 0,
         "last_results": [],
         "engine_name": "",
         "video_duration": 0,
@@ -676,9 +679,15 @@ else:
             
             st.session_state.last_results = results
             
-            # Agar kamida bitta natija bo'lsa, avtomatik birinchi natija vaqtiga o'tkazish
+            # Topilgan birinchi so'zning AYNAN o'z vaqtiga seek qilish
             if results and len(results) > 0:
-                st.session_state.play_timestamp = float(results[0]["start"])
+                # res["start"] — topilgan so'zning aniq boshlanish vaqti
+                target_ts = max(0.0, float(results[0]["start"]))
+                dur = float(st.session_state.get("video_duration", 0.0) or 0.0)
+                if dur > 1.0:
+                    target_ts = min(target_ts, max(0.0, dur - 0.8))
+                st.session_state.play_timestamp = target_ts
+                st.session_state.seek_id = st.session_state.get("seek_id", 0) + 1
                 st.rerun()
 
         if st.session_state.last_results:
@@ -709,7 +718,13 @@ else:
                 """, unsafe_allow_html=True)
 
                 if st.button(f"▶ {start_fmt} dan ijro etish", key=f"play_{i}_{start_fmt}"):
-                    st.session_state.play_timestamp = float(res["start"])
+                    # Aynan topilgan so'zning o'zidan boshlash
+                    target_ts = max(0.0, float(res["start"]))
+                    dur = float(st.session_state.get("video_duration", 0.0) or 0.0)
+                    if dur > 1.0:
+                        target_ts = min(target_ts, max(0.0, dur - 0.8))
+                    st.session_state.play_timestamp = target_ts
+                    st.session_state.seek_id = st.session_state.get("seek_id", 0) + 1
                     st.rerun()
 
         elif st.session_state.last_results == [] and perform_search:
@@ -744,11 +759,12 @@ else:
                     if st.session_state.segments:
                         from subtitle_engine import render_youtube_player
                         render_youtube_player(
-                            st.session_state.video_path, 
-                            st.session_state.segments, 
+                            st.session_state.video_path,
+                            st.session_state.segments,
                             start_time=start_time,
                             video_duration=st.session_state.get('video_duration', 0.0),
-                            debug=False
+                            debug=False,
+                            seek_id=st.session_state.get('seek_id', 0),
                         )
                     else:
                         st.audio(st.session_state.video_path, start_time=start_time)
@@ -756,11 +772,12 @@ else:
                     if st.session_state.segments:
                         from subtitle_engine import render_youtube_player
                         render_youtube_player(
-                            st.session_state.video_path, 
-                            st.session_state.segments, 
+                            st.session_state.video_path,
+                            st.session_state.segments,
                             start_time=start_time,
                             video_duration=st.session_state.get('video_duration', 0.0),
-                            debug=False
+                            debug=False,
+                            seek_id=st.session_state.get('seek_id', 0),
                         )
                     else:
                         st.video(st.session_state.video_path, start_time=start_time)

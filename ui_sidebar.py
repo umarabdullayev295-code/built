@@ -15,50 +15,74 @@ def render_sidebar() -> None:
         with st.expander("🌐 Til va Hudud", expanded=True):
             lang_choice = st.selectbox(
                 "Media tili:",
-                ["O'zbekcha", "Russian", "English", "Turkish"],
+                ["🔍 Avtomatik", "O'zbekcha", "Russian", "English", "Turkish", "Arabic", "German", "French", "Spanish", "Chinese", "Japanese"],
                 index=0,
             )
-            lang_map = {"O'zbekcha": "uz", "Russian": "ru", "English": "en", "Turkish": "tr"}
+            lang_map = {
+                "🔍 Avtomatik": "auto",
+                "O'zbekcha": "uz",
+                "Russian":   "ru",
+                "English":   "en",
+                "Turkish":   "tr",
+                "Arabic":    "ar",
+                "German":    "de",
+                "French":    "fr",
+                "Spanish":   "es",
+                "Chinese":   "zh",
+                "Japanese":  "ja",
+            }
             st.session_state.target_lang = lang_map[lang_choice]
 
         with st.expander("🤖 AI Dvigatel", expanded=True):
-            if st.session_state.target_lang == "uz":
-                if "engine_label_ui" not in st.session_state:
-                    st.session_state.engine_label_ui = (
-                        "Whisper (Asosiy)"
-                        if "Whisper" in st.session_state.get("engine_choice", "")
-                        else "UzbekPro"
+            lang = st.session_state.target_lang
+
+            if lang == "uz":
+                # O'zbek tili: Uzbek Pro (Muxlisa) yoki Whisper
+                UZ_ENGINES = [
+                    "⭐ Uzbek Pro  (Muxlisa AI)",
+                    "🖥️ Whisper     (Offline)",
+                ]
+                uz_engine = st.selectbox(
+                    "Transkripsiya modeli:",
+                    UZ_ENGINES,
+                    index=0,
+                    key="uz_engine_choice",
+                    help="Uzbek Pro — eng aniq (60s gacha). Whisper — internet siz.",
+                )
+
+                if "Muxlisa" in uz_engine:
+                    engine_choice = "Muxlisa AI (Uzbek Pro)"
+                    st.success("🛠️ **Uzbek Pro** — Muxlisa AI faol.")
+                    st.warning("⚠️ Maksimal davomiylik: 60 soniya.")
+                else:
+                    engine_choice = "Whisper (Asosiy)"
+                    st.info("🖥️ **Whisper** — Internet siz, lokal ishlov.")
+                    st.session_state["whisper_model"] = st.selectbox(
+                        "Whisper model hajmi:",
+                        ["tiny", "base", "small", "medium", "large-v2", "large-v3"],
+                        index=1,
                     )
 
-                engine_label = st.selectbox(
-                    "Transkripsiya modeli:",
-                    ["UzbekPro", "Whisper (Asosiy)"],
-                    index=0 if st.session_state.engine_label_ui == "UzbekPro" else 1,
-                    key="engine_label_ui",
-                    help="O'zbek tili uchun 'UzbekPro' tavsiya etiladi (60s gacha).",
-                )
-                engine_choice = (
-                    "Muxlisa AI (Uzbek Pro)"
-                    if engine_label == "UzbekPro"
-                    else "Whisper (Asosiy)"
-                )
             else:
-                engine_label = "Whisper (Asosiy)"
+                # Boshqa barcha tillar — faqat Whisper
                 engine_choice = "Whisper (Asosiy)"
-                st.info(f"💡 {lang_choice} tili uchun Whisper qo'llaniladi.")
-
-            st.session_state["engine_choice"] = engine_choice
-
-            if engine_label == "UzbekPro":
-                st.success("🛰️ UzbekPro faol.")
-                st.warning("⚠️ UzbekPro rejimi uchun media davomiyligi 60s gacha.")
-            else:
+                lang_display = {
+                    "ru": "Rus", "en": "Ingliz", "tr": "Turk",
+                    "ar": "Arab", "de": "Nemis", "fr": "Fransuz",
+                    "es": "Ispan", "zh": "Xitoy", "ja": "Yapon",
+                    "auto": "Avtomatik",
+                }.get(lang, lang.upper())
+                st.info(f"🖥️ {lang_display} tili — Whisper (offline model).")
                 st.session_state["whisper_model"] = st.selectbox(
                     "Whisper model hajmi:",
                     ["tiny", "base", "small", "medium", "large-v2", "large-v3"],
-                    index=1,
+                    index=3 if lang == "auto" else 1,
+                    help="Ko'p tilli modellar uchun 'medium' tavsiya etiladi.",
                 )
-                st.info("💡 O'zbek tili uchun `medium` yoki `large-v2` tavsiya etiladi.")
+
+            st.session_state["engine_choice"] = engine_choice
+
+
 
         st.markdown("---")
 

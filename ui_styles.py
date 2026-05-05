@@ -474,7 +474,7 @@ def inject_global_styles():
         background-size: 200% auto;
         -webkit-background-clip: text;
         -webkit-text-fill-color: transparent;
-        animation: shine 4s linear infinite;
+        animation: shine 4s linear infinite, titlePulse 2.8s ease-in-out infinite;
         letter-spacing: -3px;
         margin: 0 !important;
     }}
@@ -487,7 +487,13 @@ def inject_global_styles():
     }}
 
     @keyframes shine {{
+        from {{ background-position: 0% center; }}
         to {{ background-position: 200% center; }}
+    }}
+
+    @keyframes titlePulse {{
+        0%, 100% {{ transform: translateY(0px); filter: brightness(1); }}
+        50% {{ transform: translateY(-1px); filter: brightness(1.12); }}
     }}
 
     /* ── Info Banner (Welcome) ── */
@@ -726,8 +732,8 @@ def inject_global_styles():
     .main-header h1 {{
         font-size: 1.75rem !important;
         letter-spacing: -0.5px !important;
-        background-size: 220% auto !important;
-        animation: shine 5.5s linear infinite !important;
+        background-size: 260% auto !important;
+        animation: shine 3.2s linear infinite, titlePulse 2.2s ease-in-out infinite !important;
     }}
     .main-header p {{ font-size: 0.95rem !important; }}
     .info-banner {{ padding: 1.25rem 1rem !important; margin: 1rem 0 !important; border-radius: 18px !important; }}

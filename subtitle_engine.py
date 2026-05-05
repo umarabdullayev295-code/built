@@ -1,12 +1,12 @@
 """
 subtitle_engine.py
 ------------------
-Professional real-time subtitle engine.
-- YouTube Shorts / TikTok uslubida so'z-so'z yoki karaoke subtitr
-- Avtomatik timestamp scale (video va audio davomiyliklari farqini to'g'rilash)
-- 3 ta caption rejimi: 1-Word, Progressive, Karaoke
-- requestAnimationFrame asosidagi real-time JS engine (lag yo'q)
-- Debug rejim: video/audio/timestamp farqini ko'rsatadi
+YouTube uslubida real-time subtitle engine.
+- So'z o'z vaqtida chiqadi, keyingi so'z boshlangunicha ushlab turiladi
+- requestAnimationFrame asosidagi precision engine (lag yo'q)
+- Binary search bilan O(log n) tezlik
+- Seek/pause/play xavfsiz
+- Glassmorphism dizayn
 """
 
 import streamlit as st
@@ -16,12 +16,11 @@ from typing import List, Dict, Optional
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# UTILITY: Video b64 encoding (keshlanadi — har safar qayta o'qilmaydi)
+# UTILITY: Video base64 (cached)
 # ─────────────────────────────────────────────────────────────────────────────
 
 @st.cache_data(show_spinner=False)
 def get_video_b64(video_path: str, cache_key: str = "") -> str:
-    """Video faylni base64 ko'rinishida o'qiydi va keshlaydi."""
     try:
         with open(video_path, "rb") as f:
             return base64.b64encode(f.read()).decode("utf-8")
@@ -40,73 +39,46 @@ def scale_timestamps(
     debug: bool = False,
 ) -> List[Dict]:
     """
-    Subtitlelar juda tez yoki kech chiqsa bu funksiya vaqtlarni
-    video davomiyligiga mos ravishda avtomatik miqyoslashtiradi (scale).
-
-    Muammo sababi:
-        Whisper yoki boshqa STT modeli audiodagi oxirgi so'zni
-        video haqiqiy uzunligidan qisqa deb baholaydi.
-        Masalan: 60s video lekin max_timestamp=8s → scale=60/8=7.5x
-
-    Args:
-        segments      : Word-level segment list [{start, end, text}, ...]
-        video_duration: ffprobe orqali olingan haqiqiy video uzunligi (s)
-        debug         : True bo'lsa Streamlit'da debug ma'lumotlarini chiqaradi
-
-    Returns:
-        Scale qilingan yoki o'zgarmagan segments
+    STT vaqtlari video davomiyligiga mos kelmasa avtomatik scale qiladi.
     """
     if not segments or video_duration <= 0:
         return segments
 
-    # Muxlisa+audio alignment orqali "lock" qilingan timingga scale tegmasin.
+    # Timing lock qilingan bo'lsa (Muxlisa audio alignment) — scale tegmasin
     if segments and segments[0].get("__timing_locked__", False):
         return segments
 
-    # Oldin scale qilingan bo'lsa, qayta scale qilmaymiz (double-scalingdan himoya)
+    # Ikkinchi marta scale qilmaslik
     if segments and segments[0].get("__scaled__", False):
         return segments
 
-    # Barcha so'zlardan maksimal vaqtni aniqlaymiz
     max_timestamp = max(s.get("end", 0) for s in segments)
+    if max_timestamp <= 0:
+        return segments
 
-    # Video va subtitr uzunliklari o'rtasidagi farq nisbati
     diff_ratio = abs(video_duration - max_timestamp) / video_duration
-    
-    # Subtitr va video davomiyligi sezilarli farq qilsa scale qilamiz.
-    # Juda kichik farqni (2% gacha) o'zgartirmaymiz.
-    if max_timestamp > 0 and 0.02 < diff_ratio < 0.35:
-        scale = video_duration / max_timestamp
 
+    if 0.02 < diff_ratio < 0.35:
+        scale = video_duration / max_timestamp
         if debug:
-            st.warning(
-                f"⚠️ **Timing noto'g'ri!** Scale koeffitsienti: **{scale:.3f}x**  \n"
-                f"Barcha {len(segments)} ta so'z vaqtlari ozgina to'g'irlanmoqda..."
-            )
+            st.warning(f"⚠️ Timing scale: {scale:.3f}x qo'llanilmoqda ({len(segments)} segment)")
 
         scaled = []
         for s in segments:
             scaled.append({
                 **s,
                 "start": round(s.get("start", 0) * scale, 3),
-                "end": round(s.get("end", 0) * scale, 3),
-                "__scaled__": True,
+                "end":   round(s.get("end",   0) * scale, 3),
+                "__scaled__":       True,
                 "__scale_factor__": round(scale, 6),
             })
-
-        if debug:
-            st.success(f"✅ Scale muvaffaqiyatli: {scale:.3f}x qo'llanildi")
-
         return scaled
-
-    if debug:
-        st.success("✅ Timing aniq — (Katta siljish mavjud emas)")
 
     return segments
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# MAIN: Professional video player with real-time subtitle engine
+# MAIN: YouTube-style video player with precise subtitle engine
 # ─────────────────────────────────────────────────────────────────────────────
 
 def render_youtube_player(
@@ -115,98 +87,100 @@ def render_youtube_player(
     start_time: float = 0.0,
     video_duration: float = 0.0,
     debug: bool = False,
-    latency_offset: float = 0.0
+    latency_offset: float = 0.0,
+    seek_id: int = 0,
 ):
     """
-    TikTok/YouTube Shorts uslubidagi professional subtitle player.
+    YouTube uslubidagi professional subtitle player.
 
-    Args:
-        video_path    : MP4 fayl yo'li
-        segments      : Word-level [{start, end, text}, ...] list
-        start_time    : Videoni shu vaqtdan boshlash (qidiruv natijasida)
-        video_duration: Video haqiqiy davomiyligi (scale uchun)
-        debug         : Timing debug ma'lumotlarini ko'rsatish
+    - Har bir so'z o'z vaqtida chiqadi
+    - Gap bo'lsa (≤1.5s) — oldingi so'z keyingisigacha ushlab turiladi
+    - Uzoq tanaffus (>1.5s) — subtitle yo'qoladi
+    - requestAnimationFrame + binary search (O log n, lag yo'q)
     """
 
-    # ── Fayl tekshiruvi ──
     if not video_path or not os.path.exists(video_path):
         st.error("❌ Media fayl topilmadi.")
         return
 
     if not segments:
-        st.warning("⚠️ Subtitlelar uchun segment ma'lumotlari topilmadi.")
+        st.warning("⚠️ Segment ma'lumotlari topilmadi.")
         return
 
-    # Qidiruvdan bosilganda aynan topilgan vaqtdan boshlaymiz.
-    if start_time > 0:
-        start_time = max(0.0, float(start_time))
+    start_time = max(0.0, float(start_time))
 
-    # ── Timestamp auto-scale ──
+    # Auto-scale
     if video_duration > 0:
         segments = scale_timestamps(segments, video_duration, debug=debug)
 
-    # ── Base64 encoding (cache bust: path bir xil bo'lsa ham yangi kontent yangilansin) ──
-    stat = os.stat(video_path)
+    # AVI/MKV/MOV → mp4 (brauzer uchun mos format)
+    try:
+        from video_processor import ensure_browser_compatible
+        video_path = ensure_browser_compatible(video_path)
+    except Exception:
+        pass  # Xato bo'lsa originalini ishlatamiz
+
+    # Base64 encode (fayl o'zgarmasa keshdan olinadi, judayam tez)
+    stat      = os.stat(video_path)
     cache_key = f"{video_path}:{stat.st_mtime_ns}:{stat.st_size}"
     video_b64 = get_video_b64(video_path, cache_key=cache_key)
     if not video_b64:
         st.error("❌ Video yuklab bo'lmadi.")
         return
 
-    # ── MIME type ──
-    ext = os.path.splitext(video_path)[1].lower().lstrip(".")
+    # MIME type
+    ext       = os.path.splitext(video_path)[1].lower().lstrip(".")
     audio_exts = {"mp3", "wav", "m4a", "ogg", "flac"}
-    is_audio = ext in audio_exts
-    tag = "audio" if is_audio else "video"
-    mime_map = {"mp3": "audio/mpeg", "wav": "audio/wav", "m4a": "audio/mp4",
-                "ogg": "audio/ogg", "flac": "audio/flac",
-                "mp4": "video/mp4", "webm": "video/webm", "ogv": "video/ogg"}
-    mime_type = mime_map.get(ext, f"{'audio' if is_audio else 'video'}/{ext}")
+    is_audio   = ext in audio_exts
+    tag        = "audio" if is_audio else "video"
+    mime_map   = {
+        "mp3": "audio/mpeg", "wav": "audio/wav", "m4a": "audio/mp4",
+        "ogg": "audio/ogg",  "flac": "audio/flac",
+        "mp4": "video/mp4",  "webm": "video/webm", "ogv": "video/ogg",
+        "avi": "video/x-msvideo", "mov": "video/quicktime",
+    }
+    mime_type    = mime_map.get(ext, f"{'audio' if is_audio else 'video'}/{ext}")
+    autoplay_attr = "autoplay muted playsinline"
 
-    autoplay_attr = "autoplay" if start_time > 0 else ""
-
-    # ── Subtitle span HTML ──
-    word_spans = " ".join([
+    # Word span HTML
+    word_spans = "\n".join([
         f'<span class="word" data-start="{s["start"]}" data-end="{s["end"]}" id="w{i}">'
         f'{s["text"]}</span>'
         for i, s in enumerate(segments)
     ])
 
-    # ─────────────────────────────────────────────────────────────────────────
-    # HTML + CSS + JS
-    # ─────────────────────────────────────────────────────────────────────────
-    html_code = f"""
-<!DOCTYPE html>
-<html>
+    player_height = 300 if is_audio else 620
+
+    html_code = f"""<!DOCTYPE html>
+<html lang="uz">
 <head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="seek_id" content="{seek_id}">
 <style>
-  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@600;800;900&display=swap');
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@500;700;900&display=swap');
 
-  * {{ box-sizing: border-box; margin: 0; padding: 0; }}
+  *, *::before, *::after {{ box-sizing: border-box; margin: 0; padding: 0; }}
 
-  body {{
+  html, body {{
+    width: 100%; height: 100%;
     background: transparent;
-    font-family: 'Inter', sans-serif;
+    font-family: 'Inter', system-ui, sans-serif;
     overflow: hidden;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    height: 100vh;
   }}
 
+  /* ── Player wrapper ── */
   .player-wrap {{
     position: relative;
-    width: 100%;
-    height: 100%;
+    width: 100%; height: 100%;
     background: #000;
-    border-radius: 14px;
+    border-radius: 12px;
     overflow: hidden;
-    box-shadow: 0 16px 48px rgba(0,0,0,0.9);
+    box-shadow: 0 10px 40px rgba(0,0,0,0.6);
   }}
 
   {tag} {{
-    width: 100%;
-    height: 100%;
+    width: 100%; height: 100%;
     object-fit: contain;
     background: #000;
     outline: none;
@@ -216,260 +190,274 @@ def render_youtube_player(
   /* ── Subtitle overlay ── */
   .sub-overlay {{
     position: absolute;
-    bottom: 12%;
+    bottom: {'12%' if is_audio else '15%'};
     left: 0; right: 0;
     display: flex;
     justify-content: center;
     align-items: flex-end;
-    padding: 0 5%;
-    z-index: 100;
+    padding: 0 4%;
+    z-index: 20;
     pointer-events: none;
   }}
 
+  /* ── Caption box — modern dark glass ── */
   .caption-box {{
-    background: rgba(0, 0, 0, 0.24);
-    border: 1px solid rgba(255,255,255,0.08);
-    border-radius: 12px;
-    padding: 5px 10px;
-    will-change: transform, opacity;
-    max-width: 90%;
-    display: flex;
-    flex-wrap: wrap;
-    justify-content: center;
+    display: inline-flex;
     align-items: center;
-    gap: 4px 10px;
-    /* Fade in/out */
+    justify-content: center;
+    min-width: 80px;
+    max-width: 90%;
+    padding: 10px 30px;
+    background: transparent;
+    pointer-events: none;
+    
     opacity: 0;
-    transform: translateY(12px);
-    transition: opacity 0.18s ease-out, transform 0.18s ease-out;
-    pointer-events: auto;
+    transform: translateY(12px) scale(0.95);
+    transition: opacity 0.15s ease-out, transform 0.15s ease-out;
+    will-change: opacity, transform;
   }}
 
-  .caption-box.show {{
+  .caption-box.visible {{
     opacity: 1;
-    transform: translateY(0);
+    transform: translateY(0) scale(1);
   }}
 
-  /* ── Individual word chip ── */
+  /* ── Individual word ── */
   .word {{
     display: none;
-    font-size: clamp(1.25rem, 3.8vw, 2rem);
+    font-size: clamp(2.5rem, 7vw, 4.5rem);
     font-weight: 900;
-    color: rgba(255,255,255,0.96);
-    letter-spacing: 0;
-    text-shadow:
-      0 1px 2px rgba(0,0,0,0.95),
-      0 0 1px rgba(0,0,0,0.9);
-    transition:
-      color       0.05s ease-out,
-      transform   0.07s cubic-bezier(0, 0, 0.2, 1);
+    line-height: 1.1;
+    color: #ffffff;
+    text-shadow: 
+      0 3px 0 #000, 
+      0 -3px 0 #000, 
+      3px 0 0 #000, 
+      -3px 0 0 #000,
+      0 6px 15px rgba(0,0,0,0.8);
+    text-transform: uppercase;
+    cursor: pointer;
+    user-select: none;
+    white-space: nowrap;
+    
+    /* Modern Tiktok Pop */
+    animation: wordPop 0.15s cubic-bezier(0.175, 0.885, 0.32, 1.275) both;
+  }}
+
+  @keyframes wordPop {{
+    0% {{ transform: scale(0.7) translateY(10px) rotate(-2deg); opacity: 0; }}
+    100% {{ transform: scale(1) translateY(0) rotate(0); opacity: 1; }}
   }}
 
   .word.active {{
     display: inline-block;
-    color: #ffffff;
-    transform: scale(1.03);
-    text-shadow:
-      0 1px 2px rgba(0,0,0,0.98),
-      0 0 2px rgba(0,0,0,0.92);
+    pointer-events: auto;
   }}
 
-  /* ── Mode switcher (top-right, appears on hover) ── */
-  /* Mode bar removed as requested */
+  .word:hover {{
+    color: #ffd700;
+    transform: scale(1.05);
+  }}
 
-  .m-btn {{
-    background: rgba(0,0,0,0.65);
-    color: rgba(255,255,255,0.85);
-    border: 1px solid rgba(255,255,255,0.22);
-    padding: 5px 13px;
-    border-radius: 20px;
-    font-size: 0.78rem;
-    font-weight: 700;
+  .subtitle-progress {{
+    position: absolute;
+    bottom: 0; left: 0;
+    height: 4px;
+    background: linear-gradient(90deg, #00d2ff, #3a7bd5);
+    width: 0%;
+    transition: width 0.1s linear;
+    z-index: 30;
+  }}
+
+  /* ── Click-to-play overlay ── */
+  .play-overlay {{
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(0,0,0,0.5);
+    z-index: 50;
     cursor: pointer;
-    backdrop-filter: blur(4px);
-    transition: background 0.15s, color 0.15s;
-    letter-spacing: 0.04em;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.3s ease;
   }}
-  .m-btn.on {{ background: #FFD700; color: #111; border-color: #FFD700; }}
-
-  @media (max-width: 600px) {{
-    .word {{ font-size: 1.08rem; }}
-    .caption-box {{ padding: 4px 8px; gap: 2px 5px; }}
-    .sub-overlay {{ bottom: 10%; }}
+  .play-overlay.show {{
+    opacity: 1;
+    pointer-events: auto;
   }}
+  .play-btn {{
+    width: 80px; height: 80px;
+    background: rgba(255,255,255,0.2);
+    backdrop-filter: blur(10px);
+    border: 2px solid rgba(255,255,255,0.4);
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 2.5rem;
+    color: #fff;
+    transition: transform 0.2s ease, background 0.2s ease;
+  }}
+  .play-btn:hover {{ transform: scale(1.1); background: rgba(255,255,255,0.3); }}
 </style>
 </head>
 <body>
 <div class="player-wrap">
-
-  <{tag} id="vid" controls {autoplay_attr} preload="auto">
+  <{tag} id="vid" controls playsinline preload="auto">
     <source src="data:{mime_type};base64,{video_b64}" type="{mime_type}">
   </{tag}>
 
-  <!-- No switcher -->
+  <div class="play-overlay" id="playOverlay">
+    <div class="play-btn">▶</div>
+  </div>
 
-  <!-- Subtitle overlay -->
   <div class="sub-overlay">
     <div class="caption-box" id="cbox">
       {word_spans}
     </div>
   </div>
 
+  <div class="subtitle-progress" id="prog"></div>
 </div>
 
 <script>
-/* ══════════════════════════════════════════════════════════
-   PROFESSIONAL REAL-TIME SUBTITLE ENGINE
-   - requestAnimationFrame (no setInterval lag)
-   - 3 modes: word-by-word | progressive | karaoke
-   - seek/pause/play safe
-══════════════════════════════════════════════════════════ */
-
-const vid   = document.getElementById('vid');
-const cbox  = document.getElementById('cbox');
+const vid = document.getElementById('vid');
+const cbox = document.getElementById('cbox');
+const overlay = document.getElementById('playOverlay');
+const prog = document.getElementById('prog');
 const words = Array.from(document.querySelectorAll('.word'));
-let mode    = 1;   // Forced to Word-by-word mode
-const starts = words.map(w => parseFloat(w.dataset.start));
-const ends = words.map(w => parseFloat(w.dataset.end));
+const n = words.length;
 
-/* ── Pre-compute phrase groups (burst gap > 0.9s → new phrase) ── */
-const phrases = [];
-let cur = [];
-let maxTimestamp = 0;
-// Global sync adjustment
-const PERCEPTION_OFFSET = 0.015; 
-const MANUAL_LATENCY    = {latency_offset}; 
-const SYNC_DELAY        = 0.0 + MANUAL_LATENCY; 
-
-words.forEach((w, idx) => {{
-  const st = parseFloat(w.dataset.start);
-  const end = parseFloat(w.dataset.end);
-  if (end > maxTimestamp) maxTimestamp = end;
-
-  const prevEnd = cur.length ? parseFloat(cur[cur.length-1].dataset.end) : 0;
-  // Increase block size to 12 words, similar to a standard YouTube subtitle line
-  if (idx > 0 && (st - prevEnd > 1.2 || cur.length >= 12)) {{
-    phrases.push(cur);
-    cur = [w];
-  }} else {{
-    cur.push(w);
-  }}
-}});
-if (cur.length) phrases.push(cur);
-
-/* ── Debug ── */
-vid.addEventListener('loadedmetadata', () => {{
-  console.log("----- SUBTITLE ENGINE DEBUG -----");
-  console.log("Total Words:", words.length);
-  console.log("Max Timestamp (subtitles):", maxTimestamp.toFixed(2));
-  console.log("Video Duration (real):", vid.duration.toFixed(2));
-  console.log("---------------------------------");
+const starts = new Float64Array(n);
+const ends = new Float64Array(n);
+words.forEach((w, i) => {{
+  starts[i] = parseFloat(w.dataset.start);
+  ends[i] = parseFloat(w.dataset.end);
 }});
 
-
-/* ── Helpers ── */
-function hideAll() {{
-  words.forEach(w => {{
-    w.style.display = 'none';
-    w.classList.remove('active', 'passed');
-  }});
+// Calculate effective ends (keep gapless if within 1.5s)
+const MAX_GAP = 1.5;
+const effEnds = new Float64Array(n);
+for (let i = 0; i < n; i++) {{
+  effEnds[i] = (i < n - 1 && (starts[i + 1] - ends[i]) <= MAX_GAP) ? starts[i + 1] : ends[i];
 }}
 
-function findActiveGlobalIdx(ct) {{
-  /* Strict timeline: word faqat o'z intervalida ko'rinadi */
-  const t = ct - SYNC_DELAY;
-  if (!starts.length) return -1;
+const TARGET = {start_time};
+let lastIdx = -1;
+let rafId = null;
 
-  // Binary search: last index with start <= t
-  let lo = 0;
-  let hi = starts.length - 1;
-  let idx = -1;
+// Ensure we only attempt seeking once initially
+let initialSeekDone = false;
+
+function doSeekAndPlay() {{
+  if (!initialSeekDone) {{
+    vid.currentTime = TARGET;
+    initialSeekDone = true;
+  }}
+  
+  vid.muted = true; // Browser autoplay policies require muted initially
+  const playPromise = vid.play();
+  
+  if (playPromise !== undefined) {{
+    playPromise.then(() => {{
+      overlay.classList.remove('show');
+      // Attempt to unmute after successful play (might be blocked, but we try)
+      vid.muted = false;
+    }}).catch(error => {{
+      console.warn("Autoplay prevented:", error);
+      overlay.classList.add('show');
+    }});
+  }}
+}}
+
+// Play Overlay logic
+overlay.addEventListener('click', () => {{
+  overlay.classList.remove('show');
+  vid.muted = false;
+  if(Math.abs(vid.currentTime - TARGET) > 0.5 && TARGET > 0) {{
+      vid.currentTime = TARGET;
+  }}
+  vid.play();
+}});
+
+// Core Engine Loop
+function bisect(t) {{
+  let lo = 0, hi = n - 1, idx = -1;
   while (lo <= hi) {{
-    const mid = (lo + hi) >> 1;
-    if (starts[mid] <= t) {{
-      idx = mid;
-      lo = mid + 1;
-    }} else {{
-      hi = mid - 1;
+    const mid = (lo + hi) >>> 1;
+    if (starts[mid] <= t) {{ idx = mid; lo = mid + 1; }}
+    else {{ hi = mid - 1; }}
+  }}
+  return idx;
+}}
+
+function renderLoop() {{
+  const t = vid.currentTime;
+  const idx = bisect(t);
+  const active = (idx >= 0 && t < effEnds[idx]) ? idx : -1;
+
+  if (vid.duration > 0) {{
+    prog.style.width = (t / vid.duration * 100).toFixed(2) + '%';
+  }}
+
+  if (active !== lastIdx) {{
+    if (lastIdx >= 0) {{
+      words[lastIdx].style.display = 'none';
+      words[lastIdx].classList.remove('active');
     }}
+    if (active >= 0) {{
+      const w = words[active];
+      w.style.display = 'none';
+      w.classList.remove('active');
+      void w.offsetWidth; // force reflow for animation
+      w.style.display = 'inline-block';
+      w.classList.add('active');
+      cbox.classList.add('visible');
+    }} else {{
+      cbox.classList.remove('visible');
+    }}
+    lastIdx = active;
   }}
-  if (idx < 0) return -1;
 
-  // Minimal grace: erta/kechikishni kamaytirish uchun juda kichik buffer
-  const ws = starts[idx] - PERCEPTION_OFFSET;
-  const we = ends[idx] + 0.005;
-  if (t >= ws && t <= we) return idx;
-  return -1;
+  rafId = requestAnimationFrame(renderLoop);
 }}
 
-/* ── Main render loop ── */
-function render() {{
-  const ct = vid.currentTime;
-  const activeIdx = findActiveGlobalIdx(ct);
-  hideAll();
-  if (activeIdx < 0) {{
-    cbox.classList.remove('show');
-    requestAnimationFrame(render);
-    return;
+// Events
+vid.addEventListener('loadedmetadata', () => {{
+  doSeekAndPlay();
+}}, {{once: true}});
+
+vid.addEventListener('canplay', () => {{
+  if (!initialSeekDone) doSeekAndPlay();
+}}, {{once: true}});
+
+vid.addEventListener('seeking', () => {{
+  if (lastIdx >= 0) {{
+    words[lastIdx].style.display = 'none';
+    words[lastIdx].classList.remove('active');
   }}
-  cbox.classList.add('show');
+  lastIdx = -1;
+  cbox.classList.remove('visible');
+}});
 
-  /* Only 1-Word display */
-  words[activeIdx].style.display = 'inline-block';
-  words[activeIdx].classList.add('active');
-
-  requestAnimationFrame(render);
-}}
-
-/* ── Mode buttons ── */
-/* Mode buttons removed */
-
-/* ── Word click → seek ── */
 words.forEach(w => {{
-  w.addEventListener('click', () => {{
+  w.addEventListener('click', e => {{
+    e.stopPropagation();
     vid.currentTime = parseFloat(w.dataset.start);
-    vid.play();
+    vid.play().catch(() => {{}});
   }});
 }});
 
-/* ── Autoplay / seek to start_time ── */
-let hasInitialSeek = false;
-function seekToStart() {{
-  if (hasInitialSeek) return;
-  if ({start_time} > 0) {{
-    const target = {start_time};
-    let attempts = 0;
-    const maxAttempts = 12;
-
-    const applySeek = () => {{
-      attempts += 1;
-      try {{
-        vid.currentTime = target;
-      }} catch (e) {{}}
-
-      // 40ms aniqlik yetarli, aks holda yana urinib ko'ramiz
-      if (Math.abs((vid.currentTime || 0) - target) <= 0.04 || attempts >= maxAttempts) {{
-        hasInitialSeek = true;
-        vid.play().catch(() => {{}});
-        return;
-      }}
-      setTimeout(applySeek, 120);
-    }};
-
-    applySeek();
-  }} else {{
-    hasInitialSeek = true;
-  }}
-}}
-vid.addEventListener('loadedmetadata', seekToStart, {{ once: true }});
-vid.addEventListener('canplay', seekToStart, {{ once: true }});
-if (vid.readyState >= 1) seekToStart();
-
-/* ── Start render loop ── */
-requestAnimationFrame(render);
+// Start loop
+if (vid.readyState >= 1) doSeekAndPlay();
+rafId = requestAnimationFrame(renderLoop);
 </script>
 </body>
-</html>
-"""
+</html>"""
 
-    st.components.v1.html(html_code, height=620 if not is_audio else 300)
+    try:
+        st.iframe(html_code, height=player_height)
+    except AttributeError:
+        # Eski Streamlit versiyalari uchun fallback
+        import streamlit.components.v1 as components
+        components.html(html_code, height=player_height)

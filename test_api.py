@@ -3,10 +3,11 @@ import os
 import soundfile as sf
 import numpy as np
 import tempfile
+from pathlib import Path
 from dotenv import load_dotenv
 
-# Load .env explicitly
-load_dotenv()
+# Loyiha papkasidagi .env (cwd dan mustaqil)
+load_dotenv(Path(__file__).resolve().parent / ".env", override=True)
 
 MUXLISA_API_URL = "https://service.muxlisa.uz/api/v2/stt"
 API_KEY = os.environ.get("MUXLISA_API_KEY")

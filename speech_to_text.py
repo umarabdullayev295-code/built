@@ -60,25 +60,18 @@ class SpeechToText:
     # ------------------------------------------------------------------ #
     def _pick_api_client(
         self,
-        engine_name: str = "Muxlisa AI (Pro)"
+        engine_name: str = "Muxlisa AI (Uzbek Pro)"
     ):
         """
-        Mavjud va ishlaydigan API mijozini tanlaydi.
+        Muxlisa AI mijozini qaytaradi (faqat O'zbek tili uchun).
+        Boshqa tillar uchun None qaytariladi → Whisper ishlatiladi.
         """
-        from ai_labs_api import get_best_api_client
-
-        # 1. Muxlisa AI
+        from ai_labs_api import MuxlisaClient
         if "Muxlisa" in engine_name:
-            client, name = get_best_api_client(engine_name="Muxlisa")
-            if client:
-                return client, name
-
-        # 2. Fallback: Avtomatik tanlash (Muxlisa yoki boshqa)
-        client, name = get_best_api_client(engine_name=engine_name)
-        if client:
-            return client, name
-
+            c = MuxlisaClient()
+            return (c, "Muxlisa AI (Uzbek Pro)") if c.is_available() else (None, "")
         return None, ""
+
 
     # ------------------------------------------------------------------ #
     def transcribe(self, audio_path: str) -> List[Dict]:
@@ -92,34 +85,33 @@ class SpeechToText:
             print(f"[STT] Fayl topilmadi: {audio_path}")
             return []
 
-        # Faqat o'zbek tili uchun Muxlisa AI'ni ishlatamiz
         client = self._api_client
         if client is not None and client.is_available() and self.language == "uz":
-            try:
-                print(f"[STT] {self.active_engine} orqali tahlil qilinmoqda...")
-                results = client.transcribe_audio(audio_path, language=self.language)
-                
-                # O'zbekda Whisper alignment noto'g'ri bo'lishi mumkin:
-                # shu sabab Muxlisa chunk vaqtining o'zida so'zlarni taqsimlaymiz.
-                if results and any(r.get("type") == "muxlisa_raw" for r in results):
-                    print("[STT] Muxlisa AI matni chunk vaqtlarida so'zlarga ajratilmoqda...")
-                    whisper_timing = self._transcribe_whisper(audio_path)
-                    results = self._expand_muxlisa_chunks(
-                        results,
-                        audio_path=audio_path,
-                        whisper_words=whisper_timing,
-                    )
-                
-                if results:
-                    return self._finalize_segments_auto(results, audio_path)
-            except Exception as e:
-                # DNS yoki internet xatosi bo'lsa tinchgina Whisperga o'tamiz
-                if "getaddrinfo failed" in str(e) or "connection" in str(e).lower():
-                    print("[STT] Internet ulanishida muammo. Lokal (Whisper) modelga o'tilmoqda...")
-                else:
-                    print(f"[STT] API xatosi: {e}. Lokal model ishlatiladi.")
+            # Muxlisa AI faqat O'zbek tili uchun
+            from ai_labs_api import MuxlisaClient
+            if isinstance(client, MuxlisaClient):
+                try:
+                    print(f"[STT] {self.active_engine} orqali tahlil qilinmoqda...")
+                    results = client.transcribe_audio(audio_path, language=self.language)
 
-        # Whisper fallback
+                    # Muxlisa raw segmentlarini word-level ga kengaytirish
+                    if results and any(r.get("type") == "muxlisa_raw" for r in results):
+                        print("[STT] Muxlisa matni Whisper orqali 100% aniq vaqtga moslanmoqda (align)...")
+                        whisper_timing = self._transcribe_whisper(audio_path)
+                        results = self._expand_muxlisa_chunks(
+                            results, audio_path=audio_path, whisper_words=whisper_timing,
+                        )
+
+                    if results:
+                        return self._finalize_segments_auto(results, audio_path)
+
+                except Exception as e:
+                    if "getaddrinfo failed" in str(e) or "connection" in str(e).lower():
+                        print("[STT] Internet muammosi. Lokal Whisper ga o'tilmoqda...")
+                    else:
+                        print(f"[STT] API xatosi: {e}. Lokal Whisper ishlatiladi.")
+
+        # Whisper fallback — barcha tillar uchun ishlaydi
         whisper_results = self._transcribe_whisper(audio_path)
         return self._finalize_segments_auto(whisper_results, audio_path)
 
@@ -302,25 +294,9 @@ class SpeechToText:
                     try:
                         import numpy as np
 
-                        # Agar Muxlisa va Whisper so'zlar soni jiddiy farq qilsa,
-                        # force-map qilish o'rniga Whisper word timeline'ni ishlatamiz.
-                        # Bu holat amalda timingni ancha barqaror qiladi.
+                        # Matn har doim Muxlisa'dan; Whisper faqat vaqt skeleti (agar berilgan bo'lsa).
                         m = len(w_sub)
                         n = len(words)
-                        if n > 0 and (abs(m - n) / max(n, 1)) > 0.35:
-                            for ww in w_sub:
-                                ws = max(start, min(end, float(ww.get("start", start))))
-                                we = max(ws + 0.02, min(end, float(ww.get("end", ws + 0.02))))
-                                expanded.append(
-                                    {
-                                        "start": round(ws, 3),
-                                        "end": round(we, 3),
-                                        "text": str(ww.get("text", "")).strip() or str(ww.get("word", "")).strip(),
-                                        "__timing_locked__": True,
-                                        "__timing_source__": "whisper_word_timestamps",
-                                    }
-                                )
-                            continue
 
                         # Whisper bo'yicha boundary: har bir so'z start'i + oxirgi end
                         wb = [float(w_sub[0]["start"])]
@@ -559,12 +535,12 @@ class SpeechToText:
             print(f"[STT] Whisper transkripsiya (til: {self.language})...")
             segments, info = model.transcribe(
                 audio_path,
-                language=self.language,
+                language=None if self.language == "auto" else self.language,
                 beam_size=5,
                 vad_filter=True,
                 vad_parameters={"min_silence_duration_ms": 500, "speech_pad_ms": 400},
                 condition_on_previous_text=True,
-                word_timestamps=True,  # So'zma-so'z vaqtlar uchun
+                word_timestamps=True,
             )
             lang = getattr(info, "language", self.language)
             prob = getattr(info, "language_probability", 0)

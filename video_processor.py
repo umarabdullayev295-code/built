@@ -141,3 +141,49 @@ def get_video_info(video_path: str) -> dict:
         "filename": os.path.basename(video_path),
         "duration_sec": get_video_duration(video_path)
     }
+
+
+# Brauzer natively qo'llab-quvvatlaydigan formatlar
+_BROWSER_VIDEO = {"mp4", "webm", "ogv"}
+_BROWSER_AUDIO = {"mp3", "wav", "m4a", "ogg", "flac"}
+
+
+def ensure_browser_compatible(media_path: str) -> str:
+    """
+    AVI, MKV, MOV va boshqa brauzer-native bo'lmagan formatlarni
+    mp4 ga convert qiladi. mp4/webm/audio lar o'zgarishsiz qaytariladi.
+
+    Returns:
+        Browser-compatible media fayl yo'li
+    """
+    ext = os.path.splitext(media_path)[1].lower().lstrip(".")
+    if ext in _BROWSER_VIDEO or ext in _BROWSER_AUDIO:
+        return media_path  # Allaqachon mos format
+
+    ffmpeg_exe = shutil.which("ffmpeg") or "ffmpeg"
+    out_path = os.path.join(
+        tempfile.gettempdir(),
+        f"compat_{uuid.uuid4().hex[:8]}.mp4"
+    )
+
+    cmd = [
+        ffmpeg_exe, "-nostdin", "-hide_banner",
+        "-i", media_path,
+        "-c:v", "libx264", "-preset", "fast", "-crf", "23",
+        "-c:a", "aac", "-b:a", "128k",
+        "-movflags", "+faststart",   # Progressive download uchun
+        out_path, "-y"
+    ]
+
+    try:
+        _log(f"[VideoProcessor] Browser uchun convert: {ext} → mp4")
+        subprocess.run(cmd, capture_output=True, check=True, **_SUBPROCESS_TEXT_KWARGS)
+        if os.path.exists(out_path) and os.path.getsize(out_path) > 0:
+            _log(f"[VideoProcessor] Convert muvaffaqiyatli: {out_path}")
+            return out_path
+    except subprocess.CalledProcessError as e:
+        _log_err(f"[VideoProcessor] Convert xato: {e.stderr[:300]}")
+    except Exception as e:
+        _log_err(f"[VideoProcessor] Convert kutilmagan xato: {e}")
+
+    return media_path  # Xato bo'lsa originalini qaytaramiz
