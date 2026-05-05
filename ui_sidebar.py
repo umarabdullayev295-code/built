@@ -60,7 +60,7 @@ def render_sidebar() -> None:
                     st.session_state["whisper_model"] = st.selectbox(
                         "Whisper model hajmi:",
                         ["tiny", "base", "small", "medium", "large-v2", "large-v3"],
-                        index=0,
+                        index=1,
                     )
 
             else:

@@ -190,7 +190,7 @@ def render_youtube_player(
   /* ── Subtitle overlay ── */
   .sub-overlay {{
     position: absolute;
-    bottom: {'12%' if is_audio else '15%'};
+    bottom: 8%;
     left: 0; right: 0;
     display: flex;
     justify-content: center;
@@ -205,48 +205,41 @@ def render_youtube_player(
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    min-width: 80px;
-    max-width: 90%;
-    padding: 10px 30px;
-    background: transparent;
+    min-width: unset;
+    padding: 6px 16px;
+    background: rgba(0, 0, 0, 0.75);
+    border-radius: 6px;
     pointer-events: none;
     
     opacity: 0;
-    transform: translateY(12px) scale(0.95);
-    transition: opacity 0.15s ease-out, transform 0.15s ease-out;
-    will-change: opacity, transform;
+    transition: opacity 0.1s;
   }}
 
   .caption-box.visible {{
     opacity: 1;
-    transform: translateY(0) scale(1);
   }}
 
   /* ── Individual word ── */
   .word {{
     display: none;
-    font-size: clamp(2.5rem, 7vw, 4.5rem);
-    font-weight: 900;
-    line-height: 1.1;
+    font-size: clamp(1.2rem, 3.5vw, 1.8rem);
+    font-family: "Roboto", "Segoe UI", sans-serif;
+    font-weight: 500;
+    line-height: 1.3;
     color: #ffffff;
-    text-shadow: 
-      0 3px 0 #000, 
-      0 -3px 0 #000, 
-      3px 0 0 #000, 
-      -3px 0 0 #000,
-      0 6px 15px rgba(0,0,0,0.8);
-    text-transform: uppercase;
+    text-shadow: none;
+    text-transform: none;
     cursor: pointer;
     user-select: none;
     white-space: nowrap;
     
-    /* Modern Tiktok Pop */
-    animation: wordPop 0.15s cubic-bezier(0.175, 0.885, 0.32, 1.275) both;
+    /* Subtle pop for YouTube style */
+    animation: wordPop 0.1s ease-out both;
   }}
 
   @keyframes wordPop {{
-    0% {{ transform: scale(0.7) translateY(10px) rotate(-2deg); opacity: 0; }}
-    100% {{ transform: scale(1) translateY(0) rotate(0); opacity: 1; }}
+    0% {{ transform: scale(0.95); opacity: 0; }}
+    100% {{ transform: scale(1); opacity: 1; }}
   }}
 
   .word.active {{
