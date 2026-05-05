@@ -385,7 +385,8 @@ function bisect(t) {{
 }}
 
 function renderLoop() {{
-  const t = vid.currentTime;
+  // Ovozdan sal oldinroq yozuv chiqishi uchun (browser audio bufere delayini hisobga olib) offset qo'shamiz
+  const t = vid.currentTime + 0.15;
   const idx = bisect(t);
   const active = (idx >= 0 && t < effEnds[idx]) ? idx : -1;
 

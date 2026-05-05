@@ -683,8 +683,8 @@ else:
             
             # Topilgan birinchi so'zning AYNAN o'z vaqtiga seek qilish
             if results and len(results) > 0:
-                # res["start"] — topilgan so'zning aniq boshlanish vaqti
-                target_ts = max(0.0, float(results[0]["start"]))
+                # res["start"] dan sal oldinroqqa (0.15s) seek qilinadi, shunda so'z boshidan eshitiladi
+                target_ts = max(0.0, float(results[0]["start"]) - 0.15)
                 dur = float(st.session_state.get("video_duration", 0.0) or 0.0)
                 if dur > 1.0:
                     target_ts = min(target_ts, max(0.0, dur - 0.8))
@@ -720,8 +720,7 @@ else:
                 """, unsafe_allow_html=True)
 
                 if st.button(f"▶ {start_fmt} dan ijro etish", key=f"play_{i}_{start_fmt}"):
-                    # Aynan topilgan so'zning o'zidan boshlash
-                    target_ts = max(0.0, float(res["start"]))
+                    target_ts = max(0.0, float(res["start"]) - 0.15)
                     dur = float(st.session_state.get("video_duration", 0.0) or 0.0)
                     if dur > 1.0:
                         target_ts = min(target_ts, max(0.0, dur - 0.8))
