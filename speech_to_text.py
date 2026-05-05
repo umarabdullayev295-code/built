@@ -97,10 +97,7 @@ class SpeechToText:
                     # Muxlisa raw segmentlarini word-level ga kengaytirish
                     if results and any(r.get("type") == "muxlisa_raw" for r in results):
                         print("[STT] Muxlisa matni Whisper orqali 100% aniq vaqtga moslanmoqda (align)...")
-                        whisper_timing = self._transcribe_whisper(audio_path)
-                        results = self._expand_muxlisa_chunks(
-                            results, audio_path=audio_path, whisper_words=whisper_timing,
-                        )
+                        results = self._align_with_whisper(results, audio_path)
 
                     if results:
                         return self._finalize_segments_auto(results, audio_path)
