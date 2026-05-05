@@ -539,6 +539,8 @@ if st.session_state.processing and st.session_state.video_path:
         st.session_state.processing = False
         _safe_unlink(audio_path)
         _run_housekeeping(force=True)
+        import gc
+        gc.collect()
 
     if processing_ok:
         time.sleep(0.4)

@@ -586,6 +586,9 @@ class SpeechToText:
         except Exception as e:
             print(f"[STT] Whisper xatosi: {e}")
             return []
+        finally:
+            import gc
+            gc.collect()
 
     # ------------------------------------------------------------------ #
     def get_engine_name(self) -> str:
