@@ -60,7 +60,7 @@ def render_sidebar() -> None:
                     st.session_state["whisper_model"] = st.selectbox(
                         "Whisper model hajmi:",
                         ["tiny", "base", "small", "medium", "large-v2", "large-v3"],
-                        index=1,
+                        index=0,
                     )
 
             else:
@@ -76,8 +76,8 @@ def render_sidebar() -> None:
                 st.session_state["whisper_model"] = st.selectbox(
                     "Whisper model hajmi:",
                     ["tiny", "base", "small", "medium", "large-v2", "large-v3"],
-                    index=3 if lang == "auto" else 1,
-                    help="Ko'p tilli modellar uchun 'medium' tavsiya etiladi.",
+                    index=2 if lang == "auto" else 0,
+                    help="Ko'p tilli modellar uchun 'small' tavsiya etiladi.",
                 )
 
             st.session_state["engine_choice"] = engine_choice
@@ -100,7 +100,11 @@ def render_sidebar() -> None:
 
         with tab_mic:
             st.write("Telegram kabi ovoz yozib yuborish:")
-            recorded_audio = st.audio_input("Ovoz yozish", key="mic_input")
+            try:
+                recorded_audio = st.audio_input("Ovoz yozish", key="mic_input")
+            except AttributeError:
+                st.warning("Bu Streamlit versiyasida audio yozish imkoni yo'q (1.38+ kerak).")
+                recorded_audio = None
 
         active_media = recorded_audio if recorded_audio else uploaded_file
         uploaded_video = active_media
@@ -148,14 +152,6 @@ def render_sidebar() -> None:
                 # Tezlik uchun model cache'ni saqlab qolamiz.
                 # Faqat data cache tozalanadi (resource cache manual tugmada qoladi).
                 st.cache_data.clear()
-
-                try:
-                    import torch
-                    if torch.cuda.is_available():
-                        torch.cuda.empty_cache()
-                except Exception:
-                    pass
-
                 gc.collect()
 
                 st.session_state.video_path = temp_video_path
