@@ -1,7 +1,11 @@
 """
 app.py — Videodan O'zbek Tilidagi Matn va Audio Qidiruv Tizimi
 ============================================================
-Muallif: AI Assistant
+Muallif: Abdullayev Umar
+Loyihaning maqsadi: Har qanday videodan o'zbek tilida matn
+ va audio asosida aqlli qidiruv tizimini yaratish.
+ Foydalanuvchilar video ichidagi ma'lum bir sahnani, 
+ dialogni yoki mavzuni tezda topishlari mumkin.
 Texnologiyalar: Streamlit, faster-whisper, sentence-transformers, FAISS, moviepy
 """
 
@@ -88,6 +92,8 @@ def init_state():
         "target_lang": "uz",
         "theme": "dark",
         "tts_engine": "Muxlisa",
+        "uploader_reset_count": 0,
+        "show_plain_text": False,
     }
     for k, v in defaults.items():
         if k not in st.session_state:
@@ -360,6 +366,7 @@ div[data-testid="stRadio"] label {{
 .score-high {{ background: rgba(0, 200, 100, 0.1); color: #00c864; border: 1px solid rgba(0, 200, 100, 0.2); }}
 .score-mid  {{ background: rgba(255, 165, 0, 0.1); color: #ffa500; border: 1px solid rgba(255, 165, 0, 0.2); }}
 .score-low  {{ background: rgba(255, 69, 0, 0.1); color: #ff4500; border: 1px solid rgba(255, 69, 0, 0.2); }}
+.score-info {{ background: rgba(88, 166, 255, 0.1); color: #58a6ff; border: 1px solid rgba(88, 166, 255, 0.2); }}
 
 .time-badge {{
     background: rgba(124, 92, 191, 0.1);
@@ -697,7 +704,7 @@ else:
 
             for i, res in enumerate(st.session_state.last_results):
                 score = res["score"]
-                from utils import format_time, score_to_percent, get_similarity_label, highlight_text
+                from utils import format_time, score_to_percent, get_similarity_label, highlight_text, word_overlap_percent
                 label, _ = get_similarity_label(score)
 
                 score_css = "score-high" if score >= 0.65 else ("score-mid" if score >= 0.4 else "score-low")
@@ -708,11 +715,18 @@ else:
                 display_text = res.get("context_text", res["text"])
                 highlighted = highlight_text(display_text, query_text)
 
+                # So'z mos kelish foizi
+                word_pct = word_overlap_percent(query_text, display_text)
+                word_pct_str = f"{word_pct:.0f}%"
+
                 st.markdown(f"""
                 <div class="result-card">
                     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.6rem">
                         <span style="color:#8b949e;font-size:0.85rem">№{i+1}</span>
-                        <span class="score-badge {score_css}">{score_to_percent(score)} — {label}</span>
+                        <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
+                            <span class="score-badge {score_css}">{score_to_percent(score)} — {label}</span>
+                            <span class="score-badge score-info" title="So'z mos kelish foizi">{word_pct_str} so'z mos</span>
+                        </div>
                     </div>
                     <div style="font-size:0.95rem;line-height:1.6;margin-bottom:0.7rem">{highlighted}</div>
                     <span class="time-badge">⏱ {start_fmt} → {end_fmt}</span>
@@ -789,9 +803,10 @@ else:
         st.markdown("---")
         with st.expander("📜 To'liq Transkript", expanded=False):
             if st.session_state.segments:
-                # SRT yuklab olish tugmasi
-                from utils import segments_to_srt, segments_to_text
-                col_dl1, col_dl2 = st.columns(2)
+                # SRT / TXT / plain text yuklab olish tugmalari
+                from utils import segments_to_srt, segments_to_text, segments_to_plain_text
+                plain_text_content = segments_to_plain_text(st.session_state.segments)
+                col_dl1, col_dl2, col_dl3 = st.columns(3)
                 with col_dl1:
                     srt_content = segments_to_srt(st.session_state.segments)
                     st.download_button(
@@ -810,7 +825,22 @@ else:
                         mime="text/plain",
                         use_container_width=True,
                     )
-                
+                with col_dl3:
+                    st.download_button(
+                        "⬇ TXT (faqat matn)",
+                        data=plain_text_content,
+                        file_name="transkript_plain.txt",
+                        mime="text/plain",
+                        use_container_width=True,
+                    )
+
+                if st.button("📄 Matnni ko'rsatish", key="show_plain_text_button", use_container_width=True):
+                    st.session_state.show_plain_text = not st.session_state.show_plain_text
+
+                if st.session_state.show_plain_text:
+                    st.markdown("### 📄 Matn")
+                    st.text_area("", plain_text_content, height=240)
+
                 # Word-level JSON export
                 json_content = json.dumps(st.session_state.segments, indent=2, ensure_ascii=False)
                 st.download_button(

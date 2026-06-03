@@ -27,8 +27,8 @@ def format_time(seconds: float) -> str:
 
 
 def format_time_range(start: float, end: float) -> str:
-    """Vaqt oralig'ini formatlaydi: '01:23 → 01:45'"""
-    return f"{format_time(start)} → {format_time(end)}"
+    """Vaqt oralig'ini formatlaydi: '01:23 - 01:45'"""
+    return f"{format_time(start)} - {format_time(end)}"
 
 
 def cleanup_file(filepath: Optional[str]) -> bool:
@@ -52,21 +52,60 @@ def cleanup_file(filepath: Optional[str]) -> bool:
     return False
 
 
-def cleanup_files(*filepaths: str) -> None:
-    """Bir nechta faylni o'chiradi."""
-    for fp in filepaths:
-        cleanup_file(fp)
+def normalize_text_punctuation(text: str) -> str:
+    """
+    Matndagi tinish belgilarini to'g'ri joylashtiradi va ortiqcha bo'shliqlarni olib tashlaydi.
+    Hamma tillar uchun ishlashga moslashadi, shu jumladan arabcha va lotin yozuvlarida.
+
+    Misol:
+        "Assalomu Alaykum ! Qadrli yurtdoshlar." -> "Assalomu Alaykum! Qadrli yurtdoshlar."
+    """
+    if not text:
+        return text
+
+    import re
+
+    # Bir nechta bo'shliqlarni bitta bo'shliqga kamaytiramiz, lekin yangi satrni saqlaymiz
+    text = re.sub(r"[ \t]{2,}", " ", text)
+
+    # Bo'shliqdan keyin tinish belgilarini olib tashlaymiz
+    punctuation = r"\.,!\?;:،؟…，？！；：。"
+    text = re.sub(rf"\s+([{punctuation}])", r"\1", text)
+
+    # Agar tinish belgidan keyin darhol harf yoki raqam kelmasa, CJK yozuvida bo'lmasa, bo'shliq qo'yamiz
+    cjk_range = r"\u4e00-\u9fff\u3040-\u309f\u30a0-\u30ff"
+    text = re.sub(rf"([{punctuation}])([^\s{cjk_range}])", r"\1 \2", text)
+
+    return text.strip()
+
+
+def save_text_file(filepath: str, text: str, normalize: bool = True) -> bool:
+    """
+    Matnni tekst fayliga saqlaydi.
+
+    Args:
+        filepath: Saqlash uchun to'liq yo'l.
+        text: Saqlanadigan matn.
+        normalize: Ha bo'lsa, matnni tinish belgilarini to'g'rilaydi.
+
+    Returns:
+        True agar yozish muvaffaqiyatli bo'lsa, aks holda False.
+    """
+    if normalize:
+        text = normalize_text_punctuation(text)
+
+    try:
+        with open(filepath, "w", encoding="utf-8") as f:
+            f.write(text)
+        return True
+    except Exception as e:
+        print(f"[Utils] Matnni saqlashda xato ({filepath}): {e}")
+        return False
 
 
 def score_to_percent(score: float) -> str:
     """O'xshashlik ballini foizga o'tkazadi."""
     return f"{score * 100:.1f}%"
-
-
-def score_to_stars(score: float) -> str:
-    """O'xshashlik ballini yulduzchalar bilan ifodalaydi."""
-    stars = int(round(score * 5))
-    return "⭐" * stars + "☆" * (5 - stars)
 
 
 def get_similarity_label(score: float) -> tuple:
@@ -86,6 +125,32 @@ def get_similarity_label(score: float) -> tuple:
         return "Past", "#ff6d00"
     else:
         return "Juda past", "#d50000"
+
+
+def word_overlap_percent(query: str, text: str) -> float:
+    """
+    Query so'zlaridan qanchasi matnda uchraganini foizda qaytaradi.
+
+    Misol:
+        word_overlap_percent("kitob o'qish", "kitob javon") -> 50.0
+    """
+    if not query or not text:
+        return 0.0
+    import re
+
+    def _tokenize(s: str):
+        return set(
+            re.sub(r"[.,!?\"';:()\[\]\-]", "", w).lower()
+            for w in s.split()
+            if len(w.strip()) > 1
+        )
+
+    query_words = _tokenize(query)
+    text_words  = _tokenize(text)
+    if not query_words:
+        return 0.0
+    matched = query_words & text_words
+    return round(len(matched) / len(query_words) * 100, 1)
 
 
 def highlight_text(text: str, query: str) -> str:
@@ -164,8 +229,15 @@ def segments_to_text(segments: List[Dict], include_timestamps: bool = True) -> s
     return "\n".join(lines)
 
 
-def safe_filename(name: str, max_length: int = 50) -> str:
-    """Fayl nomidan xavfli belgilarni olib tashlaydi."""
-    import re
-    safe = re.sub(r'[\\/:*?"<>|]', "_", name)
-    return safe[:max_length]
+def segments_to_plain_text(segments: List[Dict]) -> str:
+    """
+    Segmentlarni faqat matn shaklida, vaqt belgilarisiz qaytaradi.
+    Har bir segmentni bitta paragrafga birlashtiradi.
+    """
+    texts = []
+    for seg in segments:
+        text = seg.get("text", "")
+        if text:
+            texts.append(" ".join(text.split()))
+    joined = " ".join(texts).strip()
+    return normalize_text_punctuation(joined)
